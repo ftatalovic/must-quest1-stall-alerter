@@ -210,7 +210,7 @@ class TestMainAndLoading(Base):
 
 
 class TestReviewRegressions(Base):
-    """R1-R5: issues found in the independent code review of commit 5366e9f."""
+    """R1-R5: issues found by the candidate in the independent code review of commit 5366e9f."""
 
     def test_r1_only_strict_yyyy_mm_dd_dates_accepted(self):
         # Python 3.11+ fromisoformat reads both of these as valid dates.

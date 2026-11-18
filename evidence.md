@@ -80,9 +80,9 @@ What the tool showed for the timed date (`--as-of 2026-11-18`): 10 to follow up 
 
 Limit: this review of existing options came from working knowledge. No web search was done.
 
-## 6. Independent code review and corrections
+## 6. Independent code review (candidate) and corrections
 
-An independent code review of commit `5366e9f` was reported by the candidate. **Result: PASS WITH ISSUES**, with three findings. Each was reproduced before fixing and corrected in commit `a5aeb8f`:
+An independent code review of commit `5366e9f` was carried out by the candidate. **Result: PASS WITH ISSUES**, with three findings. Each was reproduced before fixing and corrected in commit `a5aeb8f`:
 
 | # | Finding | Reproduced | Fix | Test |
 |---|---|---|---|---|
@@ -96,7 +96,7 @@ After the fixes: 25/25 unit tests and 11/11 acceptance checks on Python 3.9.6, 3
 
 AI (Claude) drafted the plan, the sample data, the ground truth, the tests, the tool and these documents. The full list of instructions and corrections is in `Final directive.md`. In short:
 
-- **Corrected by the independent review**: the three validation gaps in section 6.
+- **Corrected by the independent review (candidate)**: the three validation gaps in section 6.
 - **Corrected by the candidate**:
   - The AI committed with the computer's global Git identity without showing which email it was. The commits were published under a different GitHub account. The candidate noticed, and the commits were rewritten with the right identity.
   - The candidate decided that the official Quest brief should not be published, and it was removed from the history before the first push.
@@ -120,7 +120,7 @@ AI (Claude) drafted the plan, the sample data, the ground truth, the tests, the 
 
 Previously, I tended to move into implementation as soon as I understood the problem, leaving some verification decisions for later.
 
-For this Quest, I changed that approach. I defined measurable acceptance criteria and expected results before writing any application code. I also required an independent review of the AI-generated implementation and corrected the issues it identified.
+For this Quest, I changed that approach. I defined measurable acceptance criteria and expected results before writing any application code. I also required an independent review (candidate) of the AI-generated implementation and corrected the issues it identified.
 
 The main change was treating AI output as something to verify, not something to trust automatically.
 
