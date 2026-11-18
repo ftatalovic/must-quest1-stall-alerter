@@ -6,10 +6,10 @@ This file records how the AI tools were instructed, so another person can repeat
 
 | Who | Role |
 |---|---|
-| Candidate (human) | Chose Option C, approved the plan, made every decision about scope, publishing and Git, reported the independent code review, ran the timing measurement, owns the submission |
+| Candidate (human) | Chose Option C, approved the plan, made every decision about scope, publishing and Git, reported the independent code review (candidate), ran the timing measurement, owns the submission |
 | Claude Fable 5.2 | Planning only: `intent.md` and `implementation_plan.md` (no code, no data) |
 | Claude Opus 5.5, in Claude Code | Implementation: sample data, ground truth, tests, tool, Git and GitHub steps, these documents |
-| Independent code reviewer | Reviewed commit `5366e9f`. Result: PASS WITH ISSUES, three findings |
+| Independent code reviewer (candidate) | Reviewed commit `5366e9f`. Result: PASS WITH ISSUES, three findings |
 | Standing instructions | `CLAUDE.md` and `AGENTS.md`: inspect before coding, define success as numbers first, no invented results, no unapproved external actions, the human owns every decision |
 
 ## 2. The directive, step by step (reusable)
@@ -24,7 +24,7 @@ Give these to an AI coding assistant in order. **Stop after each step** and have
 
 **Step 3. Build to the tests.** "Write the tool according to the plan. Run the unit tests and the acceptance test and report the actual results and failures. Do not change the ground truth or the acceptance targets."
 
-**Step 4. Independent review.** Have someone (or a separate tool) who did not write the code review it. Then: "Make these minimal fixes: [findings]. Add a regression test for each. Keep the behaviour for the 30 sample rows unchanged. Do not change the acceptance criteria or the data. Run everything, commit, push and report the actual results."
+**Step 4. Independent review (candidate).** Have someone (or a separate tool) who did not write the code review it. Then: "Make these minimal fixes: [findings]. Add a regression test for each. Keep the behaviour for the 30 sample rows unchanged. Do not change the acceptance criteria or the data. Run everything, commit, push and report the actual results."
 
 **Step 5. Measure and document.** The person times the old way and the new way on the same file. Then: "Write `README.md`, `evidence.md` and `Final directive.md` from the actual measurements. Describe the review findings, the corrections, the regression tests and the remaining limits in plain words for a non-technical team. Do not invent verification results."
 
@@ -42,9 +42,9 @@ Give these to an AI coding assistant in order. **Stop after each step** and have
 | 1 | The AI committed with the computer's global Git identity. It checked that an email was set but did not show which one, and that email belonged to a different GitHub account. Two commits were published on GitHub under that account. | Candidate | The identity was set for this repository only (name Filip Tatalovic, account `ftatalovic`). The commits were rewritten with the same content and order, then one approved `--force-with-lease` push. GitHub's commit list was checked: every commit is attributed to `ftatalovic`. The old commit `df75d99` can still be opened by its exact ID (see `evidence.md` section 8). | `45accf6`, `9d669ba`, `4769ef5` |
 | 2 | The GitHub repository is public, and the official brief (`TASK.md`) would have been published. | AI flagged it before the first push; candidate decided | The repository stays public and `TASK.md` stays local only. It is in `.gitignore` and was removed from all history before the first push. Verified: no published commit contains it. | `45accf6` onward |
 | 3 | GitHub had created its own first commit, so a plain push would be rejected. | AI | Built on top of GitHub's commit instead of force pushing. | `7c2a87a` kept |
-| 4 | The AI said its date test covered newer Python versions. On Python 3.12 and 3.13, `2026-W47-3` was still read as a valid date and flagged. | Independent review | Exact `YYYY-MM-DD` shape check before reading a date; regression test R1. The tests are now run on 3.9, 3.12 and 3.13. | `a5aeb8f` |
-| 5 | Duplicate column names and rows with too many or too few fields were accepted silently. | Independent review | They now stop the run with a clear error and the line number; tests R2-R4. | `a5aeb8f` |
-| 6 | A blank `candidate_id` could appear in the follow-up list. | Independent review | It is now listed as a data fix; test R5. | `a5aeb8f` |
+| 4 | The AI said its date test covered newer Python versions. On Python 3.12 and 3.13, `2026-W47-3` was still read as a valid date and flagged. | Independent review (candidate) | Exact `YYYY-MM-DD` shape check before reading a date; regression test R1. The tests are now run on 3.9, 3.12 and 3.13. | `a5aeb8f` |
+| 5 | Duplicate column names and rows with too many or too few fields were accepted silently. | Independent review (candidate) | They now stop the run with a clear error and the line number; tests R2-R4. | `a5aeb8f` |
+| 6 | A blank `candidate_id` could appear in the follow-up list. | Independent review (candidate) | It is now listed as a data fix; test R5. | `a5aeb8f` |
 | 7 | One test report showed the exit code of a helper command, not of the test. | AI | Re-run without the pipe to get the real exit code (0). | none |
 | 8 | The timing baseline was spreadsheet-assisted, not fully manual. | Candidate clarification | The documents describe it as a comparison against a spreadsheet-assisted review. The candidate's estimate for a fully manual review is labelled as not measured. | this commit |
 
