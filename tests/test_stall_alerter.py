@@ -23,7 +23,9 @@ import io
 import os
 import sys
 import tempfile
+import types
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
@@ -205,6 +207,61 @@ class TestMainAndLoading(Base):
         self.assertEqual(rows[0]["candidate_id"], "C001")
         code, _, _ = run_main([path, "--as-of", AS_OF.isoformat()])
         self.assertEqual(code, 0)
+
+
+class TestReviewRegressions(Base):
+    """R1-R5: issues found in the independent code review of commit 5366e9f."""
+
+    def test_r1_only_strict_yyyy_mm_dd_dates_accepted(self):
+        # Python 3.11+ fromisoformat reads both of these as valid dates.
+        for bad in ("2026-W47-3", "20261109"):
+            with self.subTest(last_moved=bad):
+                _, _, reason = self.assertCategory(row(last_moved=bad), "data_issue")
+                self.assertIn("invalid date", reason)
+            with self.subTest(next_step=bad):
+                _, _, reason = self.assertCategory(row(last_moved=day(-30), next_step=bad), "data_issue")
+                self.assertIn("invalid next step date", reason)
+        # Simulate a fully permissive parser so the format guard is proven on any
+        # Python version, including 3.9 where fromisoformat already rejects these.
+        permissive = types.SimpleNamespace(date=types.SimpleNamespace(
+            fromisoformat=lambda s: datetime.date(2026, 11, 9)))
+        with mock.patch.object(sa, "datetime", permissive):
+            for bad in ("2026-W47-3", "20261109", "2026/11/09", "2026-11-0x"):
+                with self.subTest(permissive_parser=bad):
+                    self.assertIsNone(sa.parse_iso_date(bad))
+            self.assertEqual(sa.parse_iso_date("2026-11-09"), datetime.date(2026, 11, 9))
+
+    def assertStructuralError(self, text, expected_message):
+        code, out, err = run_main([self.write_csv(text), "--as-of", AS_OF.isoformat()])
+        self.assertEqual(code, 2)
+        self.assertIn(expected_message, err)
+        self.assertEqual(out, "", "no report may be printed for a malformed file")
+
+    def test_r2_duplicate_column_names_rejected(self):
+        self.assertStructuralError(HEADER + ",stage\nC001,A,R,Interview,2026-11-01,,X,Offer\n",
+                                   "duplicate column name(s): stage")
+
+    def test_r3_row_with_more_fields_than_header_rejected(self):
+        self.assertStructuralError(HEADER + "\nC001,A,R,Interview,2026-11-01,,X,EXTRA\n",
+                                   "line 2: more fields")
+
+    def test_r4_row_with_fewer_fields_than_header_rejected(self):
+        self.assertStructuralError(HEADER + "\nC001,A,R,Interview,2026-11-01,,X\nC002,B,R,Offer,2026-11-01\n",
+                                   "line 3: fewer fields")
+
+    def test_r5_blank_candidate_id_is_data_issue_not_follow_up(self):
+        for cid in ("", "   "):
+            with self.subTest(candidate_id=repr(cid)):
+                _, _, reason = self.assertCategory(row(cid=cid, last_moved=day(-30)), "data_issue")
+                self.assertIn("missing candidate_id", reason)
+        text = (HEADER + "\n,A,R,Interview,2026-10-01,,X\n  ,B,R,Offer,2026-10-02,,X\n"
+                "C003,C,R,Offer,2026-10-03,,X\n")
+        code, out, _ = run_main([self.write_csv(text), "--as-of", AS_OF.isoformat()])
+        self.assertEqual(code, 0, "two blank IDs must not be reported as duplicates")
+        self.assertIn("FOLLOW UP FIRST (1)", out)
+        self.assertIn(" 1. C003", out)
+        self.assertIn("NEEDS A DATA FIX (2)", out)
+        self.assertEqual(out.count("(blank id)"), 2)
 
 
 if __name__ == "__main__":

@@ -38,7 +38,11 @@ class InputError(Exception):
 
 def parse_iso_date(value):
     """Return a date for strict YYYY-MM-DD text, else None. Never guesses other formats."""
-    if len(value) != 10:  # Python 3.11+ fromisoformat also accepts e.g. 20261109
+    # Check the shape first: Python 3.11+ fromisoformat also accepts other ISO
+    # forms such as 20261109 and the week date 2026-W47-3.
+    digits = value[:4] + value[5:7] + value[8:]
+    if (len(value) != 10 or value[4] != "-" or value[7] != "-"
+            or not all(ch in "0123456789" for ch in digits)):
         return None
     try:
         return datetime.date.fromisoformat(value)
@@ -51,19 +55,32 @@ def field(row, name):
 
 
 def load_rows(path):
-    """Read the CSV (read-only). Raises InputError on missing columns or duplicate IDs."""
+    """Read the CSV (read-only). Raises InputError on a malformed structure:
+    duplicate or missing columns, rows with more or fewer fields than the
+    header, or duplicate candidate IDs."""
     with open(path, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         header = [h.strip() for h in (reader.fieldnames or [])]
+        duplicates = sorted({h for h in header if header.count(h) > 1})
+        if duplicates:
+            raise InputError(f"duplicate column name(s): {', '.join(duplicates)}")
         missing = [c for c in REQUIRED_COLUMNS if c not in header]
         if missing:
             raise InputError(f"missing required column(s): {', '.join(missing)}")
         reader.fieldnames = header
-        rows = list(reader)
+        rows = []
+        for row in reader:
+            if None in row:  # DictReader puts surplus fields under the key None
+                raise InputError(f"line {reader.line_num}: more fields than the "
+                                 f"{len(header)} header columns")
+            if None in row.values():  # DictReader fills absent fields with None
+                raise InputError(f"line {reader.line_num}: fewer fields than the "
+                                 f"{len(header)} header columns")
+            rows.append(row)
     seen = set()
     for row in rows:
         cid = field(row, "candidate_id")
-        if cid in seen:
+        if cid and cid in seen:  # blank IDs are reported per row by classify()
             raise InputError(f"duplicate candidate_id: {cid or '(blank)'}")
         seen.add(cid)
     return rows
@@ -79,6 +96,8 @@ def suggested_step(stage, next_step):
 
 def classify(row, as_of, threshold):
     """Return (category, days, reason). Rules are applied in order; first match wins."""
+    if not field(row, "candidate_id"):  # cannot be followed up without an ID
+        return "data_issue", None, "missing candidate_id"
     stage_key = field(row, "stage").lower()
     if stage_key in CLOSED_STAGES:
         return "closed", None, "closed stage"
