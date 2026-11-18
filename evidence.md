@@ -114,6 +114,7 @@ AI (Claude) drafted the plan, the sample data, the ground truth, the tests, the 
 - **Documentation gap.** `intent.md` (written before building) does not list the rules added after the review: blank IDs as a data fix, and the new structural errors. The README describes the current behaviour.
 - **Old commit still reachable.** One old commit with the wrong account attribution (`df75d99`) is no longer in the branch history, but GitHub still serves it to anyone who has its exact ID. Removing it completely needs GitHub Support or recreating the repository.
 - **Time saving** is one comparison against a spreadsheet-assisted baseline (section 4).
+- **Four findings from negative testing** are open and not fixed: a booked next step can hide a candidate, error messages are not cleaned, IDs are case-sensitive, and very old dates are accepted. Semicolon-separated files are rejected. Details in section 11.
 
 ## 9. The habit I unlearned
 
@@ -126,3 +127,101 @@ The main change was treating AI output as something to verify, not something to 
 ## 10. Next improvement
 
 Extend the synthetic dataset with more boundary cases, and have several different people do independent, timed checks on it, to replace the single comparison in section 4. The Quest limits data to synthetic or public data, so real candidate data is not the next step.
+
+## 11. Negative Testing and Safety Verification
+
+Sections 2 and 3 show the tool does what it should. This section records a second review, done by AI (Claude) at the candidate's request and accepted by the candidate, that looked for things the tool should **not** do.
+
+**Scope of these results.** They describe what was observed in the runs listed below, on one machine. They do not guarantee the absence of all possible unsafe behaviour. Inputs, Python versions, operating systems and error paths that were not run are not covered.
+
+**Conditions:** commit `28bc947` (tool code unchanged since `a5aeb8f`), Python 3.9.6 on macOS, bytecode writing switched off (`python3 -B`, `PYTHONDONTWRITEBYTECODE=1`). No code, test, dataset or acceptance target was changed, and no file was created. Negative tests were **not** repeated on Python 3.12 or 3.13.
+
+### 11.1 Source check
+
+Command: an inline `python3 -B` script that parsed `stall_alerter.py` with the `ast` module and listed every import, every function call name and every `open()` call.
+
+| Observed | Result |
+|---|---|
+| Imports | `argparse`, `csv`, `datetime`, `sys` only |
+| `open()` calls | One: `open(path, encoding="utf-8-sig", newline="")`, with no mode given, so read-only text |
+| Calls to `eval`, `exec`, `compile`, `__import__`, or any `os`, `subprocess`, `socket` function | None in the list of call names |
+
+### 11.2 Runtime trace
+
+**Method:** Python's audit hooks (`sys.addaudithook`, PEP 578). The interpreter reports events such as opening a file, opening a socket, starting a process or importing a module. A hook recorded these events only while the tool's `main()` was running. The script was run inline, not saved as a file. Its core:
+
+```python
+WATCH = ("open", "socket.", "subprocess.", "os.system", "os.exec", "os.posix_spawn",
+         "os.remove", "os.rename", "os.mkdir", "os.rmdir", "os.chmod", "os.truncate",
+         "shutil.", "urllib.", "http.", "smtplib.", "ftplib.", "exec", "compile",
+         "import", "ctypes.", "webbrowser.", "os.fork", "os.spawn", "pty.spawn",
+         "os.putenv", "os.unsetenv")
+def hook(ev, args):
+    if armed[0] and ev.startswith(WATCH):
+        events.append((ev, args[:3]))
+sys.addaudithook(hook)
+import stall_alerter
+armed[0] = True
+rc = stall_alerter.main(["data/hiring_board.csv", "--as-of", "2026-11-16", "--days", "7"])
+armed[0] = False
+```
+
+Around it, the shell took `shasum -a 256 data/hiring_board.csv` and a checksum of `ls -laR` for the project folder (excluding `.git`), before and after.
+
+**Traced run:** one run, the 30-row sample board, `--as-of 2026-11-16 --days 7`. Exit code 0, nothing on stderr, summary line `stalled 5 | not stalled 14 | scheduled 2 | closed 6 | data issues 3 | total 30`.
+
+| Question | Observed in this run |
+|---|---|
+| Network activity | **None.** No `socket.*`, `urllib.*`, `http.*`, `smtplib.*` or `ftplib.*` event. The modules `socket`, `ssl`, `http`, `urllib`, `smtplib` and `subprocess` were not loaded in the interpreter at all. |
+| Programs started | **None.** No `subprocess.*`, `os.system`, `os.exec*`, `os.posix_spawn`, `os.fork` or `os.spawn*` event. |
+| Files deleted, renamed, created or changed | **None.** No `os.remove`, `os.rename`, `os.mkdir`, `os.rmdir`, `os.chmod`, `os.truncate` or `shutil.*` event. |
+| Files opened | The input, `data/hiring_board.csv`, in mode `r`. The only other opens were Python's own cached standard-library modules, also in mode `r`. No file was opened for writing. |
+| Input file | SHA-256 identical before and after (`fe3eb702a7bf5cda...`). |
+| Project folder | Listing checksum (names, sizes, modification times) identical before and after. |
+
+One thing to explain: the standard-library module `shutil` was loaded during the run. `argparse` loads it to read the terminal width. The tool does not import it, and none of its file operations were called (no `shutil.*` event).
+
+**Limits of the trace.** One run on one input. Error paths (exit code 2) were not traced. Audit hooks only see events the Python interpreter reports; activity inside compiled extension code that reports no event would not be seen. The watch list is a list of event-name prefixes chosen by the reviewer, not every possible event.
+
+### 11.3 Malformed-input and terminal-output checks
+
+Each test board was sent on standard input, so no test file was written:
+
+```
+printf '<header>\n<rows>\n' | python3 -B stall_alerter.py /dev/stdin --as-of 2026-11-16
+```
+
+| Test input | What must not happen | Observed |
+|---|---|---|
+| Dates `20261101`, `2026-W44-1`, `2026-11-1`, `2026-11-01T00`, `2026-02-30`, `1/11/2026`, and a date typed with full-width digits | A guessed date leading to a flag | All 7 listed under "needs a data fix" as invalid date; 0 flagged |
+| ` HIRED ` with a 2020 date, `Rejected` with a blank date, `Withdrawn` with unreadable dates | A closed candidate flagged or reported as a data problem | All 3 counted as closed; 0 flagged |
+| Stages `On Hold` and `Rejected - no show` with 2020 dates | An unknown stage silently skipped or flagged | Both listed as unknown stage |
+| A candidate name containing a terminal escape code and a line break followed by the text `FOLLOW UP FIRST (0)` | The file forging or wiping part of the report on screen | Escape and line break each replaced by `?`; the candidate stayed on one line (checked with `cat -v`) |
+| A row with 4 fields instead of 7 | A partly read row | Exit 2: `line 4: fewer fields than the 7 header columns` |
+| A row of commas only | A candidate with no ID in the follow-up list | The run stopped on the short row above, so this was not observed separately here; unit test R5 covers it |
+| A byte that is not valid UTF-8 | A partly read file | Exit 2 with a decoding error, no report |
+| `--days 0`, `--days -3`, `--days 7.5`, `--days 1e3` | A run with a meaningless threshold | Exit 2 each time |
+| `--as-of 2026-11-31`, `--as-of 2026-W47-1` | A guessed reference date | Exit 2 each time |
+| `--out x.csv` | A hidden way to write a file | Exit 2, unrecognized argument; no `x.csv` was created |
+| `--days 99999999999999999999` | A crash | Exit 0, 0 flagged |
+
+A NUL byte was only sent together with the invalid UTF-8 byte, and the run stopped on the UTF-8 error first. NUL handling on its own was not observed.
+
+After these checks, `python3 -B acceptance_test.py` gave **11/11 PASS** with **25/25** unit tests, and `git status` showed no change to any tracked file.
+
+A text search of all tracked files for email addresses and for the words api key, token, password and secret found no credential and no email address.
+
+### 11.4 Findings
+
+Four weaknesses were found. **None is fixed**: the code was left unchanged on purpose after this review. None of them sends anything, changes any file or contacts the network.
+
+| # | Finding | How it was seen | Practical impact | Limit of this finding |
+|---|---|---|---|---|
+| 1 | **A booked next step can hide a candidate.** A row whose `next_step_date` is on or after the reference date is counted as "scheduled" and only appears in the summary total. It is not listed by name. | A candidate last moved on 2020-01-01 with `next_step_date` `9999-12-31` did not appear anywhere except `scheduled 1`. | Medium. A typing mistake in the next-step date, or a booking far in the future, removes a stalled candidate from the recruiter's view with no warning. The person cannot review what the tool does not show. | This follows the rule written in `intent.md`; it is a gap in the design, not a coding error. How often such dates occur in a real board is unknown. |
+| 2 | **Error messages are not cleaned.** The main report replaces control characters, but two error messages print text from the file as it is. | A duplicate `candidate_id` and a duplicate column name, each containing a terminal escape code, were printed raw to stderr. | Low. A deliberately crafted file could change colours or move the cursor in the terminal while showing an error. It cannot run commands. | Seen in two messages (duplicate ID, duplicate column). Other error messages were not checked one by one. |
+| 3 | **Candidate IDs are compared exactly.** `C001` and `c001` are treated as two different candidates. | Both were listed in the follow-up list. | Low. The same person could be listed twice if the board has inconsistent ID typing. Nobody is hidden. | Whether IDs differing only in case should count as duplicates is a decision for the team. |
+| 4 | **No sanity limit on old dates.** | `last_moved_date` `0001-01-01` was accepted and listed first with 739935 days. | Low. An obvious typing mistake is ranked as the most urgent follow-up instead of being reported as a data problem. It is visible, not hidden. | No cut-off was defined in the acceptance criteria, so any limit would be a new rule. |
+
+### 11.5 Semicolon-separated files
+
+A file using semicolons between fields was rejected: exit 2, with a message listing all 7 required columns as missing. Spreadsheet programs save CSV with semicolons under many regional settings, so a real export from the team may be refused until it is saved with commas. Nothing is misread, which is the safe outcome, but the message does not say that the separator is the cause. The tool does not detect or accept semicolons.
