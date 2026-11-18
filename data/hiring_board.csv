@@ -1,0 +1,31 @@
+candidate_id,candidate_name,role,stage,last_moved_date,next_step_date,recruiter
+C001,Ada Sample,Backend Engineer,Applied,2026-11-14,,Rina
+C002,Ben Fixture,Data Analyst,Screening,2026-11-10,,Tomo
+C003,Cora Testwell,Product Designer,Hired,2026-10-17,,Vesna
+C004,Dov Mockley,Backend Engineer,Screening,2026-11-02,,Rina
+C005,Elin Dummyson,Customer Success Lead,Screening,2026-11-12,,Tomo
+C006,Fynn Placeholder,Data Analyst,Interview,2026-11-03,2026-11-18,Vesna
+C007,Gia Synthia,Product Designer,Interview,2026-11-11,,Rina
+C008,Hugo Notreal,Backend Engineer,Rejected,2026-10-02,,Tomo
+C009,Ines Madeup,Customer Success Lead,Screening,,,Vesna
+C010,Jori Exampleton,Data Analyst,Offer,2026-11-13,,Rina
+C011,Kaia Fictive,Backend Engineer,Interview,2026-11-07,2026-11-12,Tomo
+C012,Lev Stubbs,Product Designer,Applied,2026-11-16,,Vesna
+C013,Mila Testova,Customer Success Lead,Rejected,2026-10-27,,Rina
+C014,Nico Samplewood,Data Analyst,Interview,05/11/2026,,Tomo
+C015,Oona Fakeley,Backend Engineer,Screening,2026-11-15,,Vesna
+C016,Pim Demoson,Product Designer,Withdrawn,2026-11-01,,Rina
+C017,Quin Mockford,Backend Engineer,Interview,2026-10-26,,Tomo
+C018,Rhea Dummett,Customer Success Lead,Interview,2026-11-16,,Vesna
+C019,Sami Fixtura,Data Analyst,Offer,2026-11-10,,Rina
+C020,Tova Pretendo,Product Designer,Offer,2026-11-06,2026-11-16,Tomo
+C021,Ugo Sampleby,Customer Success Lead,Applied,2026-11-11,,Vesna
+C022,Vida Testoni,Backend Engineer,Hired,2026-11-09,,Rina
+C023,Wren Exemplar,Data Analyst,Applied,2026-11-09,,Tomo
+C024,Xeni Notaperson,Backend Engineer,Offer,2026-11-15,,Vesna
+C025,Yuri Madeleaf,Product Designer,Screening,2026-11-13,,Rina
+C026,Zara Fakeworth,Customer Success Lead,Applied,2026-11-20,,Tomo
+C027,Abel Stubfield,Data Analyst,Interview,2026-11-12,,Vesna
+C028,Bea Synthwell,Product Designer,Offer,2026-11-02,,Rina
+C029,Cyd Mockerell,Backend Engineer,Applied,2026-11-14,,Tomo
+C030,Dax Placeholt,Customer Success Lead,Rejected,2026-09-17,,Vesna

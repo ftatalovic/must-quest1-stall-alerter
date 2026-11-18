@@ -1,0 +1,31 @@
+candidate_id,expected_category,expected_rank,note
+C001,not_stalled,,Applied; 2 days
+C002,not_stalled,,Screening; 6 days; boundary just under threshold; flagged at --days 6
+C003,closed,,Hired; 30 days old but closed stage is never flagged
+C004,stalled,3,Screening; 14 days; ties C028 on days and ranks after it because Offer is a later stage
+C005,not_stalled,,Screening; 4 days
+C006,scheduled,,Interview; 13 days; next step booked 2026-11-18 (after as_of)
+C007,not_stalled,,Interview; 5 days
+C008,closed,,Rejected; 45 days
+C009,data_issue,,Screening; missing date
+C010,not_stalled,,Offer; 3 days
+C011,stalled,4,Interview; 9 days; booked step 2026-11-12 has passed with no stage change
+C012,not_stalled,,Applied; 0 days
+C013,closed,,Rejected; 20 days
+C014,data_issue,,Interview; invalid date 05/11/2026 (not YYYY-MM-DD; ambiguous day/month)
+C015,not_stalled,,Screening; 1 day
+C016,closed,,Withdrawn; 15 days
+C017,stalled,1,Interview; 21 days; longest wait
+C018,not_stalled,,Interview; 0 days
+C019,not_stalled,,Offer; 6 days; boundary just under threshold; flagged at --days 6
+C020,scheduled,,Offer; 10 days; next step booked 2026-11-16 (equal to as_of)
+C021,not_stalled,,Applied; 5 days
+C022,closed,,Hired; 7 days; closed stage at exactly the threshold is not flagged
+C023,stalled,5,Applied; 7 days; boundary exactly at threshold counts as stalled
+C024,not_stalled,,Offer; 1 day
+C025,not_stalled,,Screening; 3 days
+C026,data_issue,,Applied; future date 2026-11-20 (after as_of)
+C027,not_stalled,,Interview; 4 days
+C028,stalled,2,Offer; 14 days; ties C004 on days and ranks first because Offer is a later stage
+C029,not_stalled,,Applied; 2 days
+C030,closed,,Rejected; 60 days
