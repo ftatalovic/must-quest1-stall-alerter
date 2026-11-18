@@ -105,7 +105,9 @@ AI (Claude) drafted the plan, the sample data, the ground truth, the tests, the 
 
 ## 8. What still fails or is not proven
 
-- **Independent check of the ground truth not recorded.** The plan asked for a spreadsheet check of the planted answers at 2026-11-16 before any code was written. No result of that check is recorded in this repository. The ground truth was cross-checked by an AI-written script, which is not independent: the same AI wrote the data, the answers and the tool from the same rules, so a shared misunderstanding would pass every test here.
+- **Ground truth: what was checked and what was not.**
+  - **Done:** before any tool code existed, a separate script recalculated the category of all 30 candidates from the board's dates at 2026-11-16 and compared it with the hand-written ground truth. Result: **30/30 match**. The priority order and the lists for `--days 6` and `--days 10` also matched. The script shares no code with the tool, but it was written by the same AI that wrote the ground truth, from the same rules. So a shared misunderstanding of the rules would still pass.
+  - **Not done:** a separate human check of the planted answers in Excel at 2026-11-16, as the plan suggested. (The Excel review in section 4 used 2026-11-18 and was a timing run. Its list was not compared with the tool's.)
 - **Small synthetic data only.** No real team export was tried. Untested real-world cases include renamed columns, mixed date formats, re-opened candidates and very large files.
 - **Rules the tool does not cover**: only stage changes count as movement; calendar days only; one threshold for all stages; dates must be `YYYY-MM-DD`.
 - **Strict file checks.** One badly formed row stops the whole report. This was chosen so nothing is misread, but it means one bad row blocks the list until it is fixed.
@@ -115,8 +117,12 @@ AI (Claude) drafted the plan, the sample data, the ground truth, the tests, the 
 
 ## 9. The habit I unlearned
 
-*To be written by the candidate:* one habit from the old way of working that was dropped for this Quest, and what was done instead.
+Previously, I tended to move into implementation as soon as I understood the problem, leaving some verification decisions for later.
+
+For this Quest, I changed that approach. I defined measurable acceptance criteria and expected results before writing any application code. I also required an independent review of the AI-generated implementation and corrected the issues it identified.
+
+The main change was treating AI output as something to verify, not something to trust automatically.
 
 ## 10. Next improvement
 
-*Proposed by the AI; the candidate to confirm or replace:* run the tool on a real (anonymised) export from the team's board, and time a few daily checks by different team members, including a fully manual review, to replace the single comparison above.
+Extend the synthetic dataset with more boundary cases, and have several different people do independent, timed checks on it, to replace the single comparison in section 4. The Quest limits data to synthetic or public data, so real candidate data is not the next step.

@@ -50,7 +50,7 @@ Give these to an AI coding assistant in order. **Stop after each step** and have
 
 ## 4. Checks run on the AI's own work
 
-- **Ground truth**: cross-checked against the board's dates and the targets in `intent.md` by a separate AI-written script. All checks passed. This is **not** an independent check, because the same AI wrote both. The planned spreadsheet check by a person is not recorded (see `evidence.md` section 8).
+- **Ground truth**: before any tool code existed, a separate script recalculated all 30 categories from the board's dates and compared them with the hand-written ground truth: 30/30 match, and the priority order matched too. The script is independent of the tool's code, but the same AI wrote it and the ground truth. A separate human check in Excel at 2026-11-16 was **not done** (see `evidence.md` section 8).
 - **Order of work**: Git history shows the targets, data and ground truth (`45accf6`, `9d669ba`) and the failing tests (`4769ef5`) were committed before the tool (`5366e9f`).
 - **Tests failed first**: unit tests 0/20 and acceptance 1/11 before the tool existed.
 - **Planted-bug check**: 10 of 11 deliberately planted bugs were caught by the tests.
