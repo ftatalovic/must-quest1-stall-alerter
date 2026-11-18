@@ -120,7 +120,7 @@ AI (Claude) drafted the plan, the sample data, the ground truth, the tests, the 
 
 Previously, I tended to move into implementation as soon as I understood the problem, leaving some verification decisions for later.
 
-For this Quest, I changed that approach. I defined measurable acceptance criteria and expected results before writing any application code. I also required an independent review (candidate) of the AI-generated implementation and corrected the issues it identified.
+For this Quest, I changed that approach. I defined measurable acceptance criteria and expected results before writing any application code. Besides my own independent review, I also required the AI-generated implementation to be reviewed by Codex, a different AI agent, and corrected the issues that were identified.
 
 The main change was treating AI output as something to verify, not something to trust automatically.
 
