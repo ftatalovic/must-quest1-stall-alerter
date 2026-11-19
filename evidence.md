@@ -327,7 +327,7 @@ One extra check was made by the AI before committing the golden file: its Status
 
 - **Drafted by AI (Claude Fable 5.2, in Claude Code):** the specification, the 22 tests, the feature code, the README and directive additions, and this section. The decisions in the specification (section 1) were approved by the candidate.
 - **Run and observed by the AI:** every result in sections 12.2 to 12.6.
-- **Candidate review: pending when this section was written.** The candidate had not yet reviewed the diff, the golden table by eye, or the report opened in Excel. Until that is done, this feature is AI-verified only.
+- **Candidate review: pending when this section was written.** The candidate had not yet reviewed the diff, the golden table by eye, or the report opened in Excel. Until that is done, this feature is AI-verified only. **Update: the candidate's manual verification in Excel has since been completed, see section 13.8.**
 
 Points where the implementation differs from, or adds to, the specification:
 
@@ -340,7 +340,7 @@ Points where the implementation differs from, or adds to, the specification:
 
 ### 12.8 Limits and what was not tested
 
-- **Not opened in Excel, Numbers or LibreOffice.** The file format was checked by reading the bytes and parsing it back, not by opening it in a spreadsheet program.
+- **Not opened in Excel, Numbers or LibreOffice** when this section was written. The file format was checked by reading the bytes and parsing it back, not by opening it in a spreadsheet program. The candidate has since checked the report in Excel: section 13.8.
 - macOS only, Python 3.9.6, 3.12.14 and 3.13.15. Windows and Linux were not tested.
 - With semicolon regional settings, Excel opens a comma-separated file in one column on double-click (related to section 11.5). The README describes the import route.
 - Excel may reformat the date columns for display and may reinterpret an ambiguous typed value such as `05/11/2026`. The file keeps the text as typed, and the Action / explanation column states the problem in words.
@@ -463,11 +463,11 @@ Checked with `git log` (the `Co-Authored-By` trailer of every commit):
 - **This is the tool's own report about itself. It cannot be proven from the repository**, and nothing outside the session was available to confirm it.
 - Nothing in the repository says that Opus implemented the CSV report. "Fable plans, Opus implements" is how `implementation_plan.md` and section 1 of `Final directive.md` describe the **original Quest**, and the trailers of the original build agree with that. That table was not updated when the model changed on the evening of 2026-11-18: evidence section 11 (commit `541132d`) carries a Fable trailer.
 - Conclusion: the existing attribution of the CSV report is **consistent with everything that could be checked, and otherwise unverified**. No historical commit was changed.
-- Consequence for the review: if the audit session was also Claude Fable 5.2, the review was independent as a session (it did not write the code) but **not independent as a model**. The candidate's own review is still the only human check.
+- Consequence for the review: if the audit session was also Claude Fable 5.2, the review was independent as a session (it did not write the code) but **not independent as a model**. The candidate's own review is the only human check (section 13.8).
 
 ### 13.7 Remaining risks and limits
 
-- **Manual verification in Excel by the candidate: PENDING.** No report produced by this tool has been opened in Excel, Numbers or LibreOffice by anyone. The candidate has not yet reviewed or approved this feature or these corrections.
+- **Manual verification in Excel by the candidate: was PENDING when this section was written, now COMPLETED.** See section 13.8 for what was confirmed and what that does and does not prove.
 - **No claim of general Excel safety.** The guard is checked by reading the file back in Python, under assumptions about how spreadsheet programs split and trim cells. Real programs, versions and regional settings may behave differently.
 - OWASP states that the apostrophe approach is not reliable in Excel after a file is saved and reopened. Not tested here.
 - Only comma and semicolon separators are considered. A person who imports the file with another separator chosen by hand (for example space, colon or pipe) is not protected by the semicolon rule.
@@ -479,3 +479,25 @@ Checked with `git log` (the `Co-Authored-By` trailer of every commit):
 - macOS only, Python 3.9.6, 3.12.14 and 3.13.15. On a system where symlinks, hard links or folder permissions are unavailable, the tests that need them are skipped, and AC11 then reports a failure (section 12.7, point 5).
 - The runtime trace of section 12.5 was not repeated after the corrections.
 - Still no time-saving measurement for the export.
+
+### 13.8 Candidate's manual verification in Excel (completed)
+
+Recorded on 2026-11-19, after sections 12 and 13.1 to 13.7 were written. **These checks were done by the candidate personally, in Excel. They were not done or observed by the AI**, which records here what the candidate reported. The candidate then approved the CSV export for release.
+
+The candidate confirmed all seven checks:
+
+| # | Check | Candidate's result |
+|---|---|---|
+| 1 | The report shows 12 columns, correctly displayed, and 30 candidates | Confirmed |
+| 2 | The priority order is correct | Confirmed |
+| 3 | The three data issues are correctly identified | Confirmed |
+| 4 | Scheduled candidates and their next step dates are displayed correctly | Confirmed |
+| 5 | Sorting and filtering in Excel work | Confirmed |
+| 6 | Special characters display correctly | Confirmed |
+| 7 | The agreed safe formula test cases were reviewed in Excel | Confirmed |
+
+What this does and does not show:
+
+- It closes the "not opened in Excel" gap of sections 12.8 and 13.7 for the candidate's own Excel installation. The Excel version, operating system and regional settings used were not recorded here.
+- **It is not a claim of general protection against spreadsheet formula injection.** A set of agreed test cases was reviewed in one Excel setup. The other limits in section 13.7 still apply: other spreadsheet programs, versions and regional settings, other separators, files that are saved and reopened, and cells that a person edits by hand.
+- The automated results in sections 12.4 and 13.5 are unchanged by this step. The results of the original four-hour submission (sections 1 to 11, tag `quest1-submission-baseline`) are unchanged.
