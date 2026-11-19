@@ -1,6 +1,6 @@
 # CSV export architecture (`--output` / `--out`)
 
-Status: **approved specification, not implemented yet.**
+Status: **approved specification. Implemented on 2026-11-19 on the branch `post-submission/csv-export`, then amended after an independent review: see section 13.** Sections 1 to 12 are kept as approved.
 Written: 2026-11-19. Planning by Claude Fable 5.2, decisions approved by the candidate.
 Baseline analysed: commit `12572eb98b52eacc701f34dc08d10004bf5fc160` (head of local `main` and of `origin/main` on 2026-11-19, confirmed with `git ls-remote`).
 
@@ -411,3 +411,15 @@ Before saying the feature is done, verify and record:
 5. README and evidence additions match tested behaviour and separate the baseline from the improvement.
 6. Known limits (section 11) are disclosed.
 7. The candidate has reviewed the diff and the golden table.
+
+## 13. Amendments after the independent review (2026-11-19)
+
+The review verdict was "approve with changes". These points replace the matching parts of sections 5 and 6. Results: `evidence.md` section 13.
+
+| Section | Amendment |
+|---|---|
+| 5.1 | `excel_safe()` also treats the full-width forms of `=`, `+`, `-`, `@` as formula characters, and puts an apostrophe after every semicolon that is followed (after any spaces or double quotes) by a formula character. Reason: a spreadsheet that separates on semicolons starts a new cell after each `;`, so `x;=1+1;` would otherwise put `=1+1` at the start of a cell. Quoting cannot prevent this, because in a semicolon-separated reading the quote is not at the start of the cell. |
+| 5.3, step 5 | The new file is also removed when the write or close is interrupted (`KeyboardInterrupt`) or ends with any other exception. The exception is always re-raised unchanged. A `KeyboardInterrupt` still ends the program the way Python normally does (traceback, not exit code 2). |
+| 6, step 1 | `import re` is added. It is not on AC10's forbidden list. |
+| 4.4 | The expected export for the sample board is unchanged: the board contains no semicolon and no full-width character. |
+| 11 | New limits: the guard is not verified in Excel or any other spreadsheet program; separators other than comma and semicolon are not considered; OWASP notes that an apostrophe prefix is not reliable in Excel after a file is saved and reopened. |

@@ -59,7 +59,7 @@ Nothing was sent or changed. Input file was only read.
 
 ## CSV report for Excel (added after submission)
 
-This option was added **after** the Quest was submitted, as a usability improvement approved by MUST. It was **not** part of the original four-hour build. The state of the repository before it is kept under the Git tag `quest1-submission-baseline`. Design and limits: `docs/CSV_EXPORT_ARCHITECTURE.md`. Results: `evidence.md` section 12.
+This option was added **after** the Quest was submitted, as a usability improvement approved by MUST. It was **not** part of the original four-hour build. The state of the repository before it is kept under the Git tag `quest1-submission-baseline`. Design and limits: `docs/CSV_EXPORT_ARCHITECTURE.md`. Results: `evidence.md` sections 12 and 13.
 
 ```
 python3 stall_alerter.py data/hiring_board.csv --as-of 2026-11-16 --days 7 --output followup.csv
@@ -99,9 +99,10 @@ Good to know:
 
 - **Excel shows everything in one column?** With some regional settings, double-clicking a comma-separated file does that. Use Data > From Text/CSV and choose comma as the separator.
 - Excel may show the dates in your local style. The file itself keeps the text as typed on the board.
-- A value that starts with `=`, `+`, `-` or `@` gets a leading apostrophe (`'`), so that a spreadsheet cannot run it as a formula. A real name such as `-Smith` therefore shows as `'-Smith`.
+- A value that starts with `=`, `+`, `-` or `@` (or their full-width forms) gets a leading apostrophe (`'`), so that a spreadsheet does not run it as a formula. A real name such as `-Smith` therefore shows as `'-Smith`. The same apostrophe is added after a semicolon that is followed by one of these characters (`x;=1` becomes `x;'=1`), because a spreadsheet that separates on semicolons starts a new cell there.
+- **This guard is a precaution, not a guarantee.** It was checked by reading the file back in tests, not in Excel itself. Treat a report made from a board you do not trust with care, and do not enable content or links a spreadsheet warns you about. Limits: `evidence.md` section 13.
 - The file is UTF-8 with a byte order mark, so Excel reads accented names correctly.
-- Not tested: opening the file in Excel itself, and Windows. See `evidence.md` section 12.
+- Not tested: opening the file in Excel itself, and Windows. See `evidence.md` sections 12 and 13.
 
 ## The rules
 
@@ -117,10 +118,10 @@ Good to know:
 
 ```
 python3 acceptance_test.py                      # acceptance test AC1-AC11, prints PASS/FAIL per line
-python3 -m unittest discover -s tests -v        # 25 original unit tests plus 22 export tests
+python3 -m unittest discover -s tests -v        # 25 original unit tests plus 32 export tests
 ```
 
-`acceptance_test.py` runs the tool on the sample board with the reference date 2026-11-16 and compares the result with `data/ground_truth.csv`, the planted answers written before the tool existed. Last result: **11/11 PASS**, 25/25 original unit tests (see `evidence.md`). The 22 export tests were added after submission with the CSV report: 22/22 (see `evidence.md` section 12).
+`acceptance_test.py` runs the tool on the sample board with the reference date 2026-11-16 and compares the result with `data/ground_truth.csv`, the planted answers written before the tool existed. Last result: **11/11 PASS**, 25/25 original unit tests (see `evidence.md`). The 32 export tests were added after submission with the CSV report: 32/32 (see `evidence.md` sections 12 and 13).
 
 ## Sample data and planted answers
 

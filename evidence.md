@@ -349,3 +349,133 @@ Points where the implementation differs from, or adds to, the specification:
 - The read-only folder test relies on normal file permissions; other failure causes (full disk, network drive) are covered only by the simulated write failure.
 - Open findings 2 to 4 of section 11.4 are unchanged.
 - **No time-saving measurement was made for the export.** The figures in section 4 are about the terminal report only.
+
+## 13. Independent review of the CSV export and corrections
+
+**Post-submission work, like section 12.** Section 12 is left as it was recorded before the review; where this section says something different, this section is the newer one (test counts, point 6 of section 12.7).
+
+### 13.1 The review
+
+- Verdict: **approve with changes**. The candidate passed the findings to the implementing AI session as a list of five priorities. The reviewer was described as "Fable's independent audit", done in a separate session.
+- The implementing session saw the candidate's summary of the findings, **not the audit report itself**, and not the mitigation the audit proposed.
+- All commits below are on the branch `post-submission/csv-export`. Nothing was merged or pushed, and no commit was rewritten.
+
+| Commit | Content |
+|---|---|
+| `4d64270` | Regression tests S1 to S10, before the corrections |
+| `819d797` | Corrections in `stall_alerter.py`, and the read-only wording in `README.md` |
+| the commit that adds this section | This section, README notes, an amendment section in the architecture document, a note in `Final directive.md` |
+
+### 13.2 Findings and corrections
+
+| # | Finding | Confirmed? | Correction |
+|---|---|---|---|
+| 1 | **Formula injection with semicolon separators.** A value such as `x;=1+1;` was written unchanged. Spreadsheet software set to semicolon separators would split it and get a cell that starts with `=1+1`. | **Yes**, reproduced by test S1 on the unchanged code. The first failing cell was `=1+1,Person 009,Test Role,...`. | An apostrophe is now put after every semicolon that is followed by a formula character: `x;'=1+1;`. See 13.3. |
+| 2 | **Full-width formula characters** (`＝ ＋ － ＠`) were not guarded. Found while checking the fix against the OWASP list, not part of the candidate's summary. | **Yes**, test S4 failed. Whether Excel really runs them was not verified; OWASP lists them as a risk in some locales. | Treated like `=`, `+`, `-`, `@`, at the start of a cell and after a semicolon. |
+| 3 | **Contradictory "read-only" statements** in `--help` and at the top of `README.md`, while the tool can now create a report file. | **Yes**, test S10 failed. | Both now say three separate things: the input board is never modified; a new report is created only when asked for; nothing is sent and no hiring decision is made. The last line of the terminal report was not touched (the terminal output must stay byte-identical) and is still true: nothing was sent or changed, and the input was only read. |
+| 4 | **Ctrl-C during the write leaves a file behind.** Only `OSError` triggered the cleanup. | **Yes**, test S8 failed: the file stayed. | Cleanup now runs for any exception, including `KeyboardInterrupt`, and the exception is always re-raised. See 13.4. |
+| 5 | **AI attribution**: all commit trailers of the export say Claude Fable 5.2, while the implementation was expected to be by Opus. | **The trailers are consistent with what can be checked; no error was found.** See 13.6. | Clarification added here and in `Final directive.md`. No commit was changed. |
+| 6 | **Missing test coverage**: hostile Action / explanation values, `stage_label()` variations, failed `close()`, hard links to the input, delimiter and quoting cases. | Coverage gaps, not defects: the tests for these (S2, S3, S6, S7, S9) passed on the unchanged code. | Tests added. |
+
+### 13.3 The formula guard: what was decided and why
+
+References, read on 2026-11-19: the OWASP "CSV Injection" page and OWASP ASVS 5.0 requirement 1.2.10 (level 3).
+
+- OWASP lists as dangerous first characters: `=`, `+`, `-`, `@`, tab, carriage return, line feed, and the full-width forms `＝ ＋ － ＠`. It also warns that checking only the start of a value is not enough, because **separators and quotes can start a new cell in the middle of a value**. That is this finding.
+- ASVS 1.2.10 asks for RFC 4180 escaping and for a single quote before `=`, `+`, `-`, `@`, tab and the null character at the start of a field.
+
+How the tool now meets this:
+
+| Risk | Handling | Checked by |
+|---|---|---|
+| `= + - @` at the start of a cell | Apostrophe in front (unchanged) | X11, S3, S5 |
+| Full-width `＝ ＋ － ＠` at the start | Apostrophe in front (new) | S4, S5 |
+| Tab, CR, LF and any other control or invisible character (for example a zero-width space) | Never reach a cell: replaced by `?` before the guard (unchanged) | X12, S4, S5 |
+| Null character | Python 3.12 and 3.13: replaced by `?` (run by hand, the cell became `?=1+1`). Python 3.9: the board is rejected with `error: cannot read`, no report | Run by hand, not an automated test |
+| Leading spaces of any kind hiding a formula character | Stripped first, then guarded (unchanged) | X11, S4 |
+| Comma, double quote inside a value | Quoted and doubled by Python's `csv` module, RFC 4180 style (unchanged) | X12, S2 |
+| A semicolon followed by a formula character, also with spaces or a double quote in between | Apostrophe right after the semicolon (new) | S1, S5 |
+| The same, in a value typed into the stage or a date column and repeated in Action / explanation | Same guard; Action / explanation and Hiring stage go through it like every other text cell | S1, S5 |
+
+S1 puts 12 hostile values into each of the 7 columns a user can type into (84 rows) and reads the report back three ways: as a comma-separated file, split on every semicolon, and parsed as a semicolon-separated CSV. No cell may start with a formula character in any of the three, even after leading spaces and double quotes are removed.
+
+Alternatives that were considered and not used:
+
+- **Putting every field in double quotes.** This is the first step of OWASP's general recipe, but it does not close this hole. Read with semicolons, the quote that opens the field is not at the start of the semicolon-cell, so the text after the `;` is still a new cell. This is reasoning about how such a reader works; it was not tried in Excel.
+- **A first line `sep=,`.** Excel-specific, changes the approved format (the header would no longer be the first line) and can interfere with how Excel detects UTF-8.
+- **Replacing semicolons** with another character. Changes what the recruiter typed in every value with a semicolon, not only in hostile ones.
+- **A tab in front of the value** (OWASP's option for Excel). It leaves a control character in the data, against this tool's rule that every cell is one printable line.
+
+The chosen guard changes only values where a semicolon is followed by a formula character. `Smith; Jones`, `a;b` and `x;y=1` are written exactly as typed (S2).
+
+### 13.4 Cleanup on interruption: was catching everything safe?
+
+The correction catches `BaseException` in the one function that writes the file. Checked before adopting it:
+
+- The exception is **always re-raised**. Ctrl-C still stops the program, with Python's usual traceback. It is not turned into exit code 2 and not hidden (S8 requires the interrupt to arrive at the caller).
+- The file is removed only after the tool itself created it in this run (`open` in mode `x` succeeded). An existing file can never be removed by this path.
+- If the interrupt arrives after the text was fully written but before the function returns, the complete file is removed as well. That is consistent: interrupted means no report.
+- Not covered: an interrupt in the instant between creating the file and starting the write, a second Ctrl-C during the cleanup itself, and a hard kill or power loss. In these cases an empty or partial file can remain. S7 and S8 simulate the failures; no real Ctrl-C was sent to a running process.
+
+### 13.5 Test results
+
+**Before the corrections** (commit `4d64270`, export code unchanged from `af75afa`, Python 3.9.6): 10 new tests, **5 failed**.
+
+| Test | What it checks | Before | After |
+|---|---|---|---|
+| S1 | No formula cell when the file is read with semicolons; 84 hostile rows | **Fail** | Pass |
+| S2 | Harmless semicolons and quotes are kept as typed | Pass | Pass |
+| S3 | A cell ending in `;` next to a guarded cell | Pass | Pass |
+| S4 | Full-width characters; spaces and invisible characters in front | **Fail** | Pass |
+| S5 | Hostile Action / explanation values: line break, escape code, formula text | **Fail** | Pass |
+| S6 | `stage_label()` with upper and lower case, spaces, non-breaking spaces, unknown and blank stages | Pass | Pass |
+| S7 | `close()` fails: exit 2, new file removed | Pass | Pass |
+| S8 | Ctrl-C during the write: interrupt passed on, new file removed | **Fail** | Pass |
+| S9 | Report onto a hard link of the board: refused, board unchanged | Pass | Pass |
+| S10 | `--help` does not say "Read-only" and states the three points | **Fail** | Pass |
+
+**After the corrections** (commit `819d797`, macOS):
+
+| Python | Original unit tests | Export tests (X and S) | Skipped | Acceptance | Three terminal-output hashes |
+|---|---|---|---|---|---|
+| 3.9.6 | 25/25 | 32/32 | 0 | 11/11 | Identical to the baseline |
+| 3.12.14 | 25/25 | 32/32 | 0 | 11/11 | Identical to the baseline |
+| 3.13.15 | 25/25 | 32/32 | 0 | 11/11 | Identical to the baseline |
+
+- AC10 now lists the imports `argparse, csv, datetime, io, os, re, sys` and reports `write-mode open() at lines [250]; --out onto input refused: True`. AC11 reports `57/57 unit tests pass | failures 0 errors 0 skipped 0`.
+- The six protected files show no difference against `quest1-submission-baseline` (`git diff --exit-code`, exit 0).
+- `data/hiring_board.csv` SHA-256 before and after all runs: `fe3eb702a7bf5cdaf3ead92b6273dc2e844b0c5aad895d1eac48f4be61cf8d6a`.
+- The report for the sample board is **byte-identical** to the one made before the corrections (`cmp`), and still equals the golden file (X1). The corrections change nothing for a board without semicolons or full-width characters.
+- Run by hand with a hostile row (`x;=1+1;` as name, `=2+2` as role, `On;-Hold` as stage), the report line was: `,C001,x;'=1+1;,'=2+2,On;'-Hold,,Needs a data fix,Tester,,unknown stage 'On;'-Hold',2026-11-16,7`.
+
+### 13.6 AI attribution: what can be verified
+
+Checked with `git log` (the `Co-Authored-By` trailer of every commit):
+
+| Commits | When | Trailer |
+|---|---|---|
+| `7c2a87a` | 2026-11-18 18:14 | None (created by GitHub) |
+| `45accf6` to `28bc947` (7 commits: instructions, data, tests, tool, review fixes, first documents) | 2026-11-18 18:19 to 19:54 | Claude Opus 5.5 |
+| `541132d` to `12572eb` (4 commits: evidence section 11 and three wording changes) | 2026-11-18 20:19 to 21:53 | Claude Fable 5.2 |
+| All commits of the CSV report, `5868da4` onwards | 2026-11-19 | Claude Fable 5.2 |
+
+- The trailer text is supplied by the Claude Code session that makes the commit. The session that implemented the CSV report and these corrections reports its model as Claude Fable 5.2 (model ID `claude-fable-5-2`), which matches its trailers and what section 12.7 and `Final directive.md` Step 6 say.
+- **This is the tool's own report about itself. It cannot be proven from the repository**, and nothing outside the session was available to confirm it.
+- Nothing in the repository says that Opus implemented the CSV report. "Fable plans, Opus implements" is how `implementation_plan.md` and section 1 of `Final directive.md` describe the **original Quest**, and the trailers of the original build agree with that. That table was not updated when the model changed on the evening of 2026-11-18: evidence section 11 (commit `541132d`) carries a Fable trailer.
+- Conclusion: the existing attribution of the CSV report is **consistent with everything that could be checked, and otherwise unverified**. No historical commit was changed.
+- Consequence for the review: if the audit session was also Claude Fable 5.2, the review was independent as a session (it did not write the code) but **not independent as a model**. The candidate's own review is still the only human check.
+
+### 13.7 Remaining risks and limits
+
+- **Manual verification in Excel by the candidate: PENDING.** No report produced by this tool has been opened in Excel, Numbers or LibreOffice by anyone. The candidate has not yet reviewed or approved this feature or these corrections.
+- **No claim of general Excel safety.** The guard is checked by reading the file back in Python, under assumptions about how spreadsheet programs split and trim cells. Real programs, versions and regional settings may behave differently.
+- OWASP states that the apostrophe approach is not reliable in Excel after a file is saved and reopened. Not tested here.
+- Only comma and semicolon separators are considered. A person who imports the file with another separator chosen by hand (for example space, colon or pipe) is not protected by the semicolon rule.
+- Whether Excel runs full-width characters as formulas was not verified; they are guarded as a precaution.
+- Text that only looks dangerous once a person edits the cell (for example removing the apostrophe) is outside what a file can prevent.
+- The apostrophe is visible and changes how a real value such as `-Smith` or `a;-b` looks.
+- Interruption: see the "not covered" cases in 13.4.
+- The null-character case differs by Python version (13.3) and has no automated test.
+- macOS only, Python 3.9.6, 3.12.14 and 3.13.15. On a system where symlinks, hard links or folder permissions are unavailable, the tests that need them are skipped, and AC11 then reports a failure (section 12.7, point 5).
+- The runtime trace of section 12.5 was not repeated after the corrections.
+- Still no time-saving measurement for the export.
