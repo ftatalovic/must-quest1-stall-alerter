@@ -513,5 +513,247 @@ class TestHostileContent(Base):
         self.assertEqual(leftovers, [], "raw control characters in the report")
 
 
+
+# ---------------------------------------------------------------------------
+# S1-S10: regression tests added after the independent review of the export
+# (verdict: approve with changes). Written before the corrections. References:
+# OWASP "CSV Injection" and OWASP ASVS 5.0 requirement 1.2.10.
+
+# OWASP list: = + - @, tab, carriage return, line feed, and the full-width forms.
+ALL_TRIGGERS = ("=", "+", "-", "@", "\t", "\r", "\n", "＝", "＋", "－", "＠")
+USER_FIELDS = ("candidate_id", "candidate_name", "role", "stage", "last_moved_date",
+               "next_step_date", "recruiter")
+
+
+def cells_if_split_on_semicolon(path):
+    """Every cell a spreadsheet would see if it split this file on semicolons.
+
+    Two readings are combined, because programs differ in how they treat quotes:
+    a plain split on ';', and a CSV parse with ';' as the delimiter. Leading
+    spaces and double quotes are dropped from each cell before it is judged, so
+    the check does not depend on how a program trims or unquotes a cell.
+    """
+    text = read_bytes(path).decode("utf-8-sig")
+    cells = []
+    for line in text.split("\r\n"):
+        cells.extend(line.split(";"))
+    for row in csv.reader(io.StringIO(text, newline=""), delimiter=";"):
+        cells.extend(row)
+    return [cell.lstrip(' " 　') for cell in cells]
+
+
+class TestReviewHardening(Base):
+    def hostile_board(self, payloads):
+        """One row per (user-controlled field, payload). Returns (path, [(field, payload, id)])."""
+        rows, placed = [], []
+        for field in USER_FIELDS:
+            for payload in payloads:
+                n = len(rows) + 1
+                row = dict(zip(INPUT_HEADER, board_row(f"C{n:03d}", name=f"Person {n:03d}")))
+                row[field] = payload
+                rows.append([row[h] for h in INPUT_HEADER])
+                placed.append((field, payload, f"Person {n:03d}" if field == "candidate_id"
+                               else f"C{n:03d}"))
+        return self.write_board(rows), placed
+
+    def assertNoFormulaCells(self, out):
+        parsed = read_export(out)
+        self.assertEqual({len(r) for r in parsed}, {12})
+        for r in parsed:
+            for cell in r:
+                self.assertFalse(cell.startswith(ALL_TRIGGERS),
+                                 f"comma-separated reading: cell can run as a formula: {cell!r}")
+        for cell in cells_if_split_on_semicolon(out):
+            self.assertFalse(cell.startswith(ALL_TRIGGERS),
+                             f"semicolon-separated reading: cell can run as a formula: {cell!r}")
+        return parsed
+
+    def test_s01_semicolon_separator_cannot_start_a_formula(self):
+        payloads = ["x;=1+1;", "x;+1+1", "x;-2+3", "x;@SUM(A1)", "x; =1+1", 'x;"=1+1',
+                    "a,b;=1+1", "x;;=1+1", ";=1+1", "x;＝1+1", 'x;" =1+1', "x;=1;=2"]
+        board, placed = self.hostile_board(payloads)
+        code, _, stderr, out = self.export(board)
+        self.assertEqual(code, 0, stderr)
+        parsed = self.assertNoFormulaCells(out)
+        self.assertEqual(len(parsed), len(placed) + 1, "a row was lost or split")
+        # The text typed in stage and in both date columns is repeated in the
+        # Action / explanation column: prove it arrived there and was checked.
+        wording = {"stage": "unknown stage", "last_moved_date": "invalid date",
+                   "next_step_date": "invalid next step date"}
+        by_id = {r[CID]: r for r in parsed[1:]}
+        for field, payload, marker in placed:
+            if field in wording:
+                with self.subTest(field=field, payload=payload):
+                    action = by_id[marker][ACTION]
+                    self.assertIn(wording[field], action)
+                    self.assertIn("x" if payload.startswith("x") else payload[:1], action)
+                    for part in action.split(";")[1:]:
+                        self.assertFalse(part.lstrip(' "').startswith(ALL_TRIGGERS), action)
+
+    def test_s02_harmless_semicolons_and_quotes_are_kept_as_typed(self):
+        values = ["Smith; Jones", "a;b", "x;1", "x;", ";", '"', 'a"b', ",", 'a,"b";c',
+                  "O'Neil", "x;y=1", "x; y-1"]
+        rows = [board_row(f"C{n:03d}", name=v) for n, v in enumerate(values, 1)]
+        code, _, stderr, out = self.export(self.write_board(rows))
+        self.assertEqual(code, 0, stderr)
+        parsed = self.assertNoFormulaCells(out)
+        by_id = {r[CID]: r for r in parsed[1:]}
+        for n, value in enumerate(values, 1):
+            with self.subTest(value=value):
+                self.assertEqual(by_id[f"C{n:03d}"][NAME], value)
+
+    def test_s03_cell_ending_with_semicolon_before_a_guarded_cell(self):
+        board = self.write_board([board_row("C001", name="x;", role="=1+1", recruiter="-1")])
+        code, _, stderr, out = self.export(board)
+        self.assertEqual(code, 0, stderr)
+        parsed = self.assertNoFormulaCells(out)
+        self.assertEqual(parsed[1][NAME], "x;")
+        self.assertEqual(parsed[1][ROLE], "'=1+1")
+        self.assertEqual(parsed[1][RECRUITER], "'-1")
+
+    def test_s04_full_width_and_invisible_leading_characters(self):
+        guarded = ["＝1+1", "＋1+1", "－2+3", "＠SUM(A1)"]
+        trimmed = [" =1+1", "　=1+1", " \t =1+1"]      # spaces of any kind are stripped
+        replaced = ["​=1+1", "﻿=1+1", "\x1b=1+1"]     # invisible characters become "?"
+        values = guarded + trimmed + replaced
+        rows = [board_row(f"C{n:03d}", name=v) for n, v in enumerate(values, 1)]
+        code, _, stderr, out = self.export(self.write_board(rows))
+        self.assertEqual(code, 0, stderr)
+        parsed = self.assertNoFormulaCells(out)
+        names = [r[NAME] for r in sorted(parsed[1:], key=lambda r: r[CID])]
+        self.assertEqual(names[:4], ["'" + v for v in guarded])
+        self.assertEqual(names[4:7], ["'=1+1"] * 3)
+        self.assertEqual(names[7:], ["?=1+1"] * 3)
+
+    def test_s05_hostile_action_explanation_values(self):
+        # (a) A line break and an escape code typed into a date reach the explanation.
+        board = self.write_board([
+            board_row("C001", moved="x\n=1+1"),
+            board_row("C002", next_step="y\x1b[2J\r\n@SUM(A1)"),
+            board_row("C003", stage="z\t-1+1"),
+        ])
+        code, _, stderr, out = self.export(board)
+        self.assertEqual(code, 0, stderr)
+        parsed = self.assertNoFormulaCells(out)
+        self.assertEqual(len(parsed), 4, "a line break in a cell split a row")
+        text = read_bytes(out).decode("utf-8-sig")
+        self.assertEqual([ch for ch in text.replace("\r\n", "") if not ch.isprintable()], [])
+        by_id = {r[CID]: r for r in parsed[1:]}
+        self.assertIn("invalid date", by_id["C001"][ACTION])
+        self.assertIn("invalid next step date", by_id["C002"][ACTION])
+        self.assertIn("unknown stage", by_id["C003"][ACTION])
+        # (b) Today every explanation starts with the tool's own words. If that wording
+        # ever changes, the explanation must still be guarded like any other text cell.
+        for reason, expected in (("=1+1", "'=1+1"), ("  @SUM(A1)", "'@SUM(A1)"),
+                                 ("why;=1+1", None), ("＝1", "'＝1")):
+            with self.subTest(reason=reason):
+                result = dict(zip(INPUT_HEADER, board_row("C001")),
+                              category="data_issue", days=None, reason=reason)
+                cell = sa.export_table([result], AS_OF, 7)[1][ACTION]
+                self.assertFalse(cell.startswith(ALL_TRIGGERS), cell)
+                if expected is not None:
+                    self.assertEqual(cell, expected)
+                for part in cell.split(";")[1:]:
+                    self.assertFalse(part.lstrip(' "').startswith(ALL_TRIGGERS), cell)
+
+    def test_s06_stage_label_case_and_whitespace(self):
+        cases = [(" OFFER ", "Offer", "Follow up first"), ("hIrEd", "Hired", "Closed"),
+                 (" Interview ", "Interview", "Follow up first"),
+                 ("screening", "Screening", "Follow up first"),
+                 ("WITHDRAWN  ", "Withdrawn", "Closed"),
+                 ("  On Hold  ", "On Hold", "Needs a data fix"),
+                 ("ON HOLD", "ON HOLD", "Needs a data fix"),
+                 ("", "", "Needs a data fix")]
+        for typed, label, _ in cases:
+            with self.subTest(stage_label=typed):
+                self.assertEqual(sa.stage_label(typed), label)
+        rows = [board_row(f"C{n:03d}", stage=c[0], moved="2026-10-01")
+                for n, c in enumerate(cases, 1)]
+        code, _, stderr, out = self.export(self.write_board(rows))
+        self.assertEqual(code, 0, stderr)
+        by_id = {r[CID]: r for r in read_export(out)[1:]}
+        for n, (typed, label, status) in enumerate(cases, 1):
+            with self.subTest(exported_stage=typed):
+                self.assertEqual(by_id[f"C{n:03d}"][STAGE], label)
+                self.assertEqual(by_id[f"C{n:03d}"][STATUS], status)
+
+    def failing_open(self, write_error=None, close_error=None):
+        """Patch for the tool's open(): the report file is really created, then its
+        write() or close() raises. Returns (patch, list of created paths)."""
+        real_open, created = open, []
+
+        class Wrapped:
+            def __init__(self, handle):
+                self.handle = handle
+
+            def write(self, text):
+                if write_error is not None:
+                    raise write_error
+                return self.handle.write(text)
+
+            def close(self):
+                self.handle.close()
+                if close_error is not None:
+                    raise close_error
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                self.close()
+                return False
+
+        def fake_open(file, mode="r", *args, **kwargs):
+            handle = real_open(file, mode, *args, **kwargs)
+            if "x" in mode:
+                created.append(file)
+                return Wrapped(handle)
+            return handle
+
+        return mock.patch.object(sa, "open", fake_open, create=True), created
+
+    def test_s07_failed_close_removes_the_new_file(self):
+        board = self.copy_of_sample_board()
+        out = os.path.join(self.tmp(), "report.csv")
+        patch, created = self.failing_open(close_error=OSError(5, "Input/output error"))
+        with patch, self.assertUnchanged(board):
+            result = self.export(board, out=out)
+        self.assertRefused(result, "cannot write")
+        self.assertEqual(created, [out])
+        self.assertFalse(os.path.lexists(out), "a report that failed to close was left behind")
+
+    def test_s08_keyboard_interrupt_during_write_removes_the_new_file(self):
+        board = self.copy_of_sample_board()
+        out = os.path.join(self.tmp(), "report.csv")
+        patch, created = self.failing_open(write_error=KeyboardInterrupt())
+        with patch, self.assertUnchanged(board):
+            with self.assertRaises(KeyboardInterrupt):  # the interrupt must not be swallowed
+                self.export(board, out=out)
+        self.assertEqual(created, [out])
+        self.assertFalse(os.path.lexists(out), "an interrupted report was left behind")
+
+    def test_s09_hard_link_to_the_input_is_refused(self):
+        board = self.copy_of_sample_board()
+        link = os.path.join(os.path.dirname(board), "hard_link.csv")
+        try:
+            os.link(board, link)
+        except (OSError, NotImplementedError, AttributeError):
+            self.skipTest("hard links are not available here")
+        for option in OPTIONS:
+            with self.subTest(option=option):
+                with self.assertUnchanged(board), self.assertUnchanged(link):
+                    result = self.export(board, option=option, out=link)
+                self.assertRefused(result, "refusing to write the report over the input file")
+
+    def test_s10_help_text_does_not_claim_read_only(self):
+        code, stdout, _ = run_main(["--help"])
+        self.assertEqual(code, 0)
+        help_text = " ".join(stdout.split())
+        self.assertNotIn("Read-only", help_text)
+        self.assertIn("never modified", help_text)       # the input board
+        self.assertIn("only when", help_text)            # a report only on request
+        self.assertIn("no hiring decision", help_text)   # nothing sent, nothing decided
+
+
 if __name__ == "__main__":
     unittest.main()
