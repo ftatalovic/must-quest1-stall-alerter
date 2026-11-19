@@ -27,6 +27,8 @@ Built for MUST Quest 1 (Option C). All data in this repository is synthetic: eve
 
 ## How to run it
 
+All commands in one place, with expected results and common problems: [`RUN_COMMANDS.md`](RUN_COMMANDS.md).
+
 From this folder:
 
 ```
@@ -157,6 +159,7 @@ This was one timed comparison on a small synthetic file, against a workflow that
 | File | What it is |
 |---|---|
 | `stall_alerter.py` | The tool |
+| `RUN_COMMANDS.md` | Quick reference: every command to run the tool and the tests |
 | `acceptance_test.py` | Acceptance test AC1-AC11 |
 | `tests/test_stall_alerter.py` | Unit tests |
 | `tests/test_csv_export.py` | Tests for the CSV report (added after submission) |
