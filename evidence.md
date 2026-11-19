@@ -225,3 +225,127 @@ Four weaknesses were found. **None is fixed**: the code was left unchanged on pu
 ### 11.5 Semicolon-separated files
 
 A file using semicolons between fields was rejected: exit 2, with a message listing all 7 required columns as missing. Spreadsheet programs save CSV with semicolons under many regional settings, so a real export from the team may be refused until it is saved with commas. Nothing is misread, which is the safe outcome, but the message does not say that the separator is the cause. The tool does not detect or accept semicolons.
+
+## 12. Post-submission improvement: CSV export
+
+**This section describes work done after the Quest was submitted. It is not part of the original four-hour build.** Sections 1 to 11 describe the repository as it was before this feature (Git tag `quest1-submission-baseline`, commit `12572eb`) and were not edited for it. The tag marks the state before the feature. Whether it is identical to the snapshot MatchHire received was **not verified**.
+
+### 12.1 What was added and why
+
+An optional CSV report: `--output FILE` (or `--out FILE`). It writes one row for every candidate on the board, with a Status column, so that a non-technical recruiter can open the result in Excel and filter it. It also makes scheduled candidates visible, which the terminal report does not list (open finding 1 in section 11.4). Without the option the tool behaves exactly as before. No business rule was added or changed. Specification: `docs/CSV_EXPORT_ARCHITECTURE.md`.
+
+Work was done on the branch `post-submission/csv-export`, one commit per phase, on 2026-11-19:
+
+| Commit | Content |
+|---|---|
+| `5868da4` | Specification only |
+| `ddb30cb` | Export tests X1 to X15 and the expected report (golden file), before any feature code |
+| `af75afa` | The feature in `stall_alerter.py` (96 lines inserted, 3 removed, docstring and blank lines included; the specification estimated 60 to 70 added lines) |
+| the commit that adds this section | README, evidence and directive additions |
+
+When this section was written, the branch and the tag existed only on the candidate's machine. Nothing had been merged or pushed.
+
+### 12.2 Baseline, observed before any change
+
+Python 3.9.6, macOS, commit `12572eb` (equal to `origin/main`, checked with `git ls-remote`):
+
+- The three terminal-output hashes and the four file hashes in the specification (section 8.1) were recomputed and matched.
+- `python3 -B -m unittest tests.test_stall_alerter`: 25 tests, OK.
+- `python3 -B acceptance_test.py`: `RESULT: 11/11 PASS`.
+
+### 12.3 The tests failed first
+
+At commit `ddb30cb` (tests and golden file, no feature code), Python 3.9.6:
+
+- `python3 -B -m unittest tests.test_csv_export`: 22 test methods, **21 failed**. The only one that passed was X5, as predicted: it describes the tool without the option.
+- The 25 original unit tests: 25/25.
+- `acceptance_test.py`: 10/11. AC11 failed, as it must while tests in `tests/` are failing.
+
+Why the refusal tests check the wording of the message: before the feature exists, `argparse` already answers an unknown `--output` with exit code 2 and text on stderr. A test that only checked "exit 2, nothing on screen" would have passed before the feature existed and proven nothing. The tests therefore also require one clean error line with the expected reason.
+
+### 12.4 Results after implementation
+
+Commands: `python3 -B -m unittest tests.test_stall_alerter`, `python3 -B -m unittest tests.test_csv_export`, `python3 -B acceptance_test.py`, and the terminal-output hashes for `--days 7`, `6` and `10`. Commit `af75afa`, macOS.
+
+| Python | Original unit tests | Export tests | Skipped | Acceptance | Three terminal-output hashes |
+|---|---|---|---|---|---|
+| 3.9.6 | 25/25 | 22/22 | 0 | 11/11 | Identical to the baseline |
+| 3.12.14 | 25/25 | 22/22 | 0 | 11/11 | Identical to the baseline |
+| 3.13.15 | 25/25 | 22/22 | 0 | 11/11 | Identical to the baseline |
+
+Two acceptance detail lines changed by design, as the specification predicted: AC10 now reads `imports ['argparse', 'csv', 'datetime', 'io', 'os', 'sys'] | write-mode open() at lines [241]; --out onto input refused: True`, and AC11 reads `47/47 unit tests pass | failures 0 errors 0 skipped 0`.
+
+Protected files: `git diff --exit-code quest1-submission-baseline -- acceptance_test.py tests/test_stall_alerter.py data/hiring_board.csv data/ground_truth.csv intent.md implementation_plan.md` returned exit code 0 (no difference).
+
+The 15 planned tests are implemented as 22 test methods:
+
+| # | What it proves | Result |
+|---|---|---|
+| X1 | The export for the sample board equals the golden file, row by row | Pass |
+| X2 | UTF-8 with BOM, CRLF line ends, the 12 column names in order, 31 lines, 12 fields per row, every candidate exactly once | Pass |
+| X3 | Priority 1 to 5 for C017, C028, C004, C011, C023; groups in the agreed order with 5, 3, 2, 14 and 6 rows; other groups in board order | Pass |
+| X4 | Days, statuses, next step dates and explanations for the planted rows; blank ID, unknown stage `On Hold` and next step `next week` shown as specified | Pass (2 methods) |
+| X5 | Without the option: the three baseline terminal hashes, empty stderr, no file created | Pass |
+| X6 | With `--output` and with `--out`: terminal report byte-identical, confirmation line on stderr, both files byte-identical | Pass |
+| X7 | Input SHA-256 unchanged after a successful export and after every refused or failed one in X8 to X10 and X13 | Pass |
+| X8 | Report onto the board refused: same path, relative versus absolute spelling, symlink to the board; both spellings of the option | Pass (2 methods) |
+| X9 | An existing file is not overwritten (bytes unchanged); an existing folder, a broken symlink and an empty name are refused | Pass (4 methods) |
+| X10 | Seven kinds of unreadable board with the option: exit 2 and no report file left | Pass |
+| X11 | 36 rows with formula-like text in each of 6 text fields: no cell starts with `=`, `+`, `-`, `@`, tab or CR; each affected cell is the original text behind an apostrophe | Pass |
+| X12 | A name with a comma, a double quote, a line break and a terminal escape code: 12 fields per row, no control character in the file | Pass |
+| X13 | Missing parent folder (not created), read-only folder, and a simulated write failure after the file was created (the new file is removed again): exit 2, one clean line, no traceback | Pass (3 methods) |
+| X14 | Two exports with equal arguments are byte-identical; `--days 6` gives 7 priority rows, `--days 10` gives 3, in the expected order; 30 rows each | Pass |
+| X15 | A board with only a header: exit 0, report with the header row only | Pass |
+
+Also run by hand as real commands (Python 3.9.6), with the report written to a temporary folder outside the repository:
+
+- `--output`: exit 0, terminal-output hash equal to the baseline, file starts with `EF BB BF`, content equal to the golden file after converting CRLF to LF.
+- `--out` to a second name: byte-identical file.
+- The same name again: exit 2, `... already exists; choose a new name or delete it first`.
+- `--out data/hiring_board.csv` and `--out DATA/HIRING_BOARD.CSV` (same file on this case-insensitive disk): exit 2, `refusing to write the report over the input file`. Board SHA-256 unchanged (`fe3eb702a7bf5cda...`).
+
+### 12.5 Safety checks for the new write path
+
+Sections 11.1 to 11.3 apply to the baseline. Their statements "no file opened for writing" and "`--out x.csv`: unrecognized argument" are true for the baseline tag and are no longer true for the tool with this feature.
+
+The runtime trace of section 11.2 (same audit-hook method and watch list) **was repeated** for the export path, once, on Python 3.9.6, with the report written to a temporary folder outside the repository:
+
+| Run | Observed |
+|---|---|
+| Successful export of the sample board | Exit 0. Two files opened outside Python's own library: `data/hiring_board.csv` in mode `r` and the report in mode `x`. No network, process, delete, rename, mkdir or chmod event. `socket`, `ssl`, `http`, `urllib`, `smtplib` and `subprocess` were not loaded. |
+| Second run onto the report that now existed | Exit 2 with the "already exists" message. No watched event at all: no file was opened, not even the board. |
+
+Board SHA-256 and the project folder listing checksum were identical before and after. Limits: one run per case, one input, one Python version; the other limits listed in section 11.2 apply. The malformed-input checks of section 11.3 were not repeated by hand for the export path; X10 to X13 cover it in the automated tests only.
+
+### 12.6 Where the expected report came from
+
+`data/expected_followup_2026-11-16.csv` is the table in the specification (section 4.4), copied verbatim, saved as plain UTF-8 with LF line ends. That table was computed during planning by a throwaway script that called the tool's own `load_rows`, `classify`, `prioritize` and `stage_label` at the baseline commit. **It is therefore not independent of the tool's classification.** X1 shows that the export code reproduces it; it does not independently prove that the classification is right. That proof is still the ground truth and AC2 to AC6.
+
+One extra check was made by the AI before committing the golden file: its Status and Priority columns were compared with `data/ground_truth.csv`, and its name, role, recruiter and next step date with `data/hiring_board.csv`. 0 mismatches in 30 rows. The Days waiting and Action / explanation columns have no independent source.
+
+### 12.7 AI contribution and human checks
+
+- **Drafted by AI (Claude Fable 5.2, in Claude Code):** the specification, the 22 tests, the feature code, the README and directive additions, and this section. The decisions in the specification (section 1) were approved by the candidate.
+- **Run and observed by the AI:** every result in sections 12.2 to 12.6.
+- **Candidate review: pending when this section was written.** The candidate had not yet reviewed the diff, the golden table by eye, or the report opened in Excel. Until that is done, this feature is AI-verified only.
+
+Points where the implementation differs from, or adds to, the specification:
+
+1. The specification asks to stop for human verification after each phase. On the candidate's instruction, all phases were run in one session, with one commit per phase so that the order (tests before code) is still visible in the history.
+2. Refusal tests check the message wording (reason in section 12.3).
+3. In X11, the candidate ID that starts with spaces is `   =2` instead of `   =1`, because two IDs that are equal after trimming would be rejected as a duplicate.
+4. The write step also catches `ValueError` (for example a file name containing a null character), so that it ends with exit 2 and one line instead of a traceback.
+5. The acceptance check AC11 fails if any test is skipped. The specification allows skips where symlinks or folder permissions are unavailable. On this machine nothing was skipped. On such a system `acceptance_test.py` would report AC11 as failed although nothing is wrong with the tool. Not changed, because `acceptance_test.py` must not be edited.
+6. The `--help` description still ends with "Read-only.", and the README still opens with "It only reads." Both describe the default behaviour and the board. They were left as they are, because the specification allows only additions there.
+
+### 12.8 Limits and what was not tested
+
+- **Not opened in Excel, Numbers or LibreOffice.** The file format was checked by reading the bytes and parsing it back, not by opening it in a spreadsheet program.
+- macOS only, Python 3.9.6, 3.12.14 and 3.13.15. Windows and Linux were not tested.
+- With semicolon regional settings, Excel opens a comma-separated file in one column on double-click (related to section 11.5). The README describes the import route.
+- Excel may reformat the date columns for display and may reinterpret an ambiguous typed value such as `05/11/2026`. The file keeps the text as typed, and the Action / explanation column states the problem in words.
+- The apostrophe guard changes how a real value that starts with `=`, `+`, `-` or `@` looks.
+- A hard kill or power loss during the single write call can leave a partial file. Not tested.
+- The read-only folder test relies on normal file permissions; other failure causes (full disk, network drive) are covered only by the simulated write failure.
+- Open findings 2 to 4 of section 11.4 are unchanged.
+- **No time-saving measurement was made for the export.** The figures in section 4 are about the terminal report only.

@@ -32,7 +32,7 @@ python3 stall_alerter.py data/hiring_board.csv --as-of 2026-11-16
 - `--as-of` is the date to count from. Leave it out to use today's date. Use `2026-11-16` to reproduce the planted answers in the sample data.
 - `--days` changes the threshold, for example `--days 10`. Default: 7.
 
-The tool never asks for a login, needs no internet, and does not create any files.
+The tool never asks for a login and needs no internet. It creates no file unless `--output` (or `--out`) is given, and then exactly one new file (see "CSV report for Excel" below).
 
 ## Reading the output
 
@@ -53,6 +53,52 @@ Nothing was sent or changed. Input file was only read.
 - **Needs a data fix**: rows the tool could not judge, with the reason. It does not guess. A person should correct these rows on the board.
 - **Summary**: every row is counted once, so you can see nothing was skipped.
 
+## CSV report for Excel (added after submission)
+
+This option was added **after** the Quest was submitted, as a usability improvement approved by MUST. It was **not** part of the original four-hour build. The state of the repository before it is kept under the Git tag `quest1-submission-baseline`. Design and limits: `docs/CSV_EXPORT_ARCHITECTURE.md`. Results: `evidence.md` section 12.
+
+```
+python3 stall_alerter.py data/hiring_board.csv --as-of 2026-11-16 --days 7 --output followup.csv
+```
+
+- `--output` and `--out` mean the same thing.
+- The report on screen is exactly the same as without the option. One extra line confirms the file: `CSV report written: followup.csv (30 rows)`.
+- The file has **one row for every candidate on the board**, so the row count matches the board. Use an Excel filter on the Status column to get the short list.
+- **The file must not exist yet.** The tool never overwrites a file and never writes over the board. If the name is taken, it stops with an error (exit code 2); choose a new name or delete the old file first. It does not create folders.
+- If the report cannot be written, the tool stops with an error and prints no report on screen.
+
+Columns, in this order:
+
+| Column | Meaning |
+|---|---|
+| Priority | 1, 2, 3... for candidates to follow up, empty for everyone else |
+| Candidate ID, Candidate name, Role | As on the board |
+| Hiring stage | The stage, or the text as typed if the tool does not know it |
+| Days waiting | Calendar days since the last stage change. Empty for closed candidates and rows with bad data |
+| Status | See below |
+| Recruiter | Who owns the candidate |
+| Next step date | As typed on the board, not corrected |
+| Action / explanation | The suggested next step, or why the row has this status. Same text as on screen |
+| As of, Threshold (days) | The reference date and threshold used for this report |
+
+Status values, in the order the rows appear:
+
+| Status | Meaning |
+|---|---|
+| Follow up first | Stalled. Rows are in priority order |
+| Needs a data fix | The tool could not judge the row. Correct it on the board |
+| Scheduled | A next step is booked for the reference date or later |
+| Not stalled | Moved recently |
+| Closed | Hired, Rejected or Withdrawn |
+
+Good to know:
+
+- **Excel shows everything in one column?** With some regional settings, double-clicking a comma-separated file does that. Use Data > From Text/CSV and choose comma as the separator.
+- Excel may show the dates in your local style. The file itself keeps the text as typed on the board.
+- A value that starts with `=`, `+`, `-` or `@` gets a leading apostrophe (`'`), so that a spreadsheet cannot run it as a formula. A real name such as `-Smith` therefore shows as `'-Smith`.
+- The file is UTF-8 with a byte order mark, so Excel reads accented names correctly.
+- Not tested: opening the file in Excel itself, and Windows. See `evidence.md` section 12.
+
 ## The rules
 
 - **Stalled** means: the stage is active (Applied, Screening, Interview, Offer), the candidate has waited **at least** the threshold (exactly 7 days counts), and no next step is booked for the reference date or later.
@@ -67,10 +113,10 @@ Nothing was sent or changed. Input file was only read.
 
 ```
 python3 acceptance_test.py                      # acceptance test AC1-AC11, prints PASS/FAIL per line
-python3 -m unittest discover -s tests -v        # 25 unit tests for rules and edge cases
+python3 -m unittest discover -s tests -v        # 25 original unit tests plus 22 export tests
 ```
 
-`acceptance_test.py` runs the tool on the sample board with the reference date 2026-11-16 and compares the result with `data/ground_truth.csv`, the planted answers written before the tool existed. Last result: **11/11 PASS**, 25/25 unit tests (see `evidence.md`).
+`acceptance_test.py` runs the tool on the sample board with the reference date 2026-11-16 and compares the result with `data/ground_truth.csv`, the planted answers written before the tool existed. Last result: **11/11 PASS**, 25/25 original unit tests (see `evidence.md`). The 22 export tests were added after submission with the CSV report: 22/22 (see `evidence.md` section 12).
 
 ## Sample data and planted answers
 
@@ -108,7 +154,10 @@ This was one timed comparison on a small synthetic file, against a workflow that
 | `stall_alerter.py` | The tool |
 | `acceptance_test.py` | Acceptance test AC1-AC11 |
 | `tests/test_stall_alerter.py` | Unit tests |
+| `tests/test_csv_export.py` | Tests for the CSV report (added after submission) |
 | `data/` | Synthetic board and planted answers |
+| `data/expected_followup_2026-11-16.csv` | Expected CSV report for the sample board (added after submission) |
+| `docs/CSV_EXPORT_ARCHITECTURE.md` | Approved design of the CSV report (added after submission) |
 | `intent.md` | Problem, choice of tool, acceptance test as numbers (written before building) |
 | `implementation_plan.md` | Approved build plan |
 | `evidence.md` | Results, corrections, time measurement, limits |

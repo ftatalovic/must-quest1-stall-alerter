@@ -28,6 +28,8 @@ Give these to an AI coding assistant in order. **Stop after each step** and have
 
 **Step 5. Measure and document.** The person times the old way and the new way on the same file. Then: "Write `README.md`, `evidence.md` and `Final directive.md` from the actual measurements. Describe the review findings, the corrections, the regression tests and the remaining limits in plain words for a non-technical team. Do not invent verification results."
 
+**Step 6. Post-submission improvement (CSV report, added after the Quest was submitted).** This step was not part of the original four-hour build. The pattern: "Act as architect: write a self-contained specification for the change and stop for approval (`docs/CSV_EXPORT_ARCHITECTURE.md`). Record the observed baseline first: commit ID, file hashes, output hashes. Tag the state before the change (`quest1-submission-baseline`) and work on a separate branch. Commit the new tests and the expected output file **before** the feature code, and show that they fail. Then implement, and show that the old tests, the old acceptance targets and the old terminal output are unchanged. Add to the documents, do not rewrite what describes the original submission. No amend, rebase, reset or force push. Do not merge or push until I have reviewed the results. If the specification is ambiguous or wrong, say so before deviating." The specification and the implementation were both drafted by Claude Fable 5.2 in Claude Code. Results and open points: `evidence.md` section 12.
+
 **Guardrails worth stating up front** (each one was learned the hard way in this Quest, see section 3):
 
 - "Before the first commit, show me the exact Git name and email that will be used, and which GitHub account will push."
