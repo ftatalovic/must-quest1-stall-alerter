@@ -2,7 +2,11 @@
 
 A small local tool for a recruiting team. It reads a hiring-board CSV file and lists the candidates who have not moved to a new stage for a set number of days (7 by default), longest wait first, with a suggested next step for each.
 
-**It only reads.** It never sends a message, never changes the board, and never makes a decision. A person reads the list and decides what to do.
+**What it does and does not do:**
+
+- **The hiring board file is never modified.** The tool only reads it.
+- **A new report file is created only when you ask for it** with `--output` (or `--out`). Without that option the tool writes nothing at all. It never overwrites an existing file.
+- **It never sends a message and never makes a hiring decision.** A person reads the list and decides what to do.
 
 Built for MUST Quest 1 (Option C). All data in this repository is synthetic: every name is invented.
 

@@ -22,6 +22,7 @@ import csv
 import datetime
 import io
 import os
+import re
 import sys
 
 REQUIRED_COLUMNS = ("candidate_id", "candidate_name", "role", "stage",
@@ -44,6 +45,11 @@ EXPORT_HEADER = ("Priority", "Candidate ID", "Candidate name", "Role", "Hiring s
 EXPORT_STATUS = (("stalled", "Follow up first"), ("data_issue", "Needs a data fix"),
                  ("scheduled", "Scheduled"), ("not_stalled", "Not stalled"),
                  ("closed", "Closed"))
+# Characters that make a spreadsheet read a cell as a formula (OWASP "CSV Injection"),
+# with their full-width forms. Tab, CR and LF never reach a cell: clean() replaces them.
+FORMULA_START = "=+-@\uff1d\uff0b\uff0d\uff20"
+# A spreadsheet set to semicolon separators starts a new cell after every ";".
+FORMULA_AFTER_SEMICOLON = re.compile(r';(?=[\s"]*[' + re.escape(FORMULA_START) + "])")
 
 
 class InputError(Exception):
@@ -190,11 +196,13 @@ def render(results, as_of, threshold):
 
 
 def excel_safe(text):
-    """Text cell for a spreadsheet: one line, and never run as a formula."""
+    """Text cell for a spreadsheet: one line, and not run as a formula. An apostrophe
+    goes before a formula character at the start of the cell, and also after a
+    semicolon, where a spreadsheet that separates on semicolons starts a new cell."""
     value = clean(text)
-    if value.startswith(("=", "+", "-", "@")):
+    if value[:1] and value[0] in FORMULA_START:
         value = "'" + value
-    return value
+    return FORMULA_AFTER_SEMICOLON.sub(";'", value)
 
 
 def export_table(results, as_of, threshold):
@@ -237,12 +245,13 @@ def check_output_path(output, csv_path):
 
 def write_new_file(path, text):
     """Create a new file and write the text. Never overwrites: mode "x" fails if the
-    path exists. If the write fails, the file created here is removed again."""
+    path exists. If the write or close fails or is interrupted (Ctrl-C), the file
+    created here is removed again and the error or interrupt is passed on."""
     f = open(path, "x", encoding="utf-8-sig", newline="")
     try:
         with f:
             f.write(text)
-    except OSError:
+    except BaseException:  # includes KeyboardInterrupt; always re-raised below
         try:
             os.remove(path)
         except OSError:
@@ -259,7 +268,10 @@ def as_of_arg(text):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="List hiring-board candidates who have not moved for N days. Read-only.")
+        description="List hiring-board candidates who have not moved for N days. "
+                    "The input file is only read and is never modified. A new CSV report "
+                    "is created only when --output is given. Nothing is sent and no hiring "
+                    "decision is made: a person reviews every line.")
     parser.add_argument("csv_path", help="hiring board CSV export")
     parser.add_argument("--as-of", type=as_of_arg, default=None,
                         help="reference date YYYY-MM-DD (default: today)")
