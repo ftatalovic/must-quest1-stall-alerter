@@ -1,0 +1,31 @@
+Priority,Candidate ID,Candidate name,Role,Hiring stage,Days waiting,Status,Recruiter,Next step date,Action / explanation,As of,Threshold (days)
+1,C017,Quin Mockford,Backend Engineer,Interview,21,Follow up first,Tomo,,"Chase interviewer feedback or book the next round, then update the candidate.",2026-11-16,7
+2,C028,Bea Synthwell,Product Designer,Offer,14,Follow up first,Rina,,Call the candidate about the pending offer and confirm the decision date.,2026-11-16,7
+3,C004,Dov Mockley,Backend Engineer,Screening,14,Follow up first,Rina,,Book or complete the screening call and tell the candidate where they stand.,2026-11-16,7
+4,C011,Kaia Fictive,Backend Engineer,Interview,9,Follow up first,Tomo,2026-11-12,"Booked step on 2026-11-12 has passed with no board update: confirm what happened. Then: chase interviewer feedback or book the next round, then update the candidate.",2026-11-16,7
+5,C023,Wren Exemplar,Data Analyst,Applied,7,Follow up first,Tomo,,Review the application and decide whether to screen or decline.,2026-11-16,7
+,C009,Ines Madeup,Customer Success Lead,Screening,,Needs a data fix,Vesna,,missing date,2026-11-16,7
+,C014,Nico Samplewood,Data Analyst,Interview,,Needs a data fix,Tomo,,invalid date '05/11/2026' (expected YYYY-MM-DD),2026-11-16,7
+,C026,Zara Fakeworth,Customer Success Lead,Applied,,Needs a data fix,Tomo,,future date 2026-11-20 (after 2026-11-16),2026-11-16,7
+,C006,Fynn Placeholder,Data Analyst,Interview,13,Scheduled,Vesna,2026-11-18,next step booked for 2026-11-18,2026-11-16,7
+,C020,Tova Pretendo,Product Designer,Offer,10,Scheduled,Tomo,2026-11-16,next step booked for 2026-11-16,2026-11-16,7
+,C001,Ada Sample,Backend Engineer,Applied,2,Not stalled,Rina,,moved recently,2026-11-16,7
+,C002,Ben Fixture,Data Analyst,Screening,6,Not stalled,Tomo,,moved recently,2026-11-16,7
+,C005,Elin Dummyson,Customer Success Lead,Screening,4,Not stalled,Tomo,,moved recently,2026-11-16,7
+,C007,Gia Synthia,Product Designer,Interview,5,Not stalled,Rina,,moved recently,2026-11-16,7
+,C010,Jori Exampleton,Data Analyst,Offer,3,Not stalled,Rina,,moved recently,2026-11-16,7
+,C012,Lev Stubbs,Product Designer,Applied,0,Not stalled,Vesna,,moved recently,2026-11-16,7
+,C015,Oona Fakeley,Backend Engineer,Screening,1,Not stalled,Vesna,,moved recently,2026-11-16,7
+,C018,Rhea Dummett,Customer Success Lead,Interview,0,Not stalled,Vesna,,moved recently,2026-11-16,7
+,C019,Sami Fixtura,Data Analyst,Offer,6,Not stalled,Rina,,moved recently,2026-11-16,7
+,C021,Ugo Sampleby,Customer Success Lead,Applied,5,Not stalled,Vesna,,moved recently,2026-11-16,7
+,C024,Xeni Notaperson,Backend Engineer,Offer,1,Not stalled,Vesna,,moved recently,2026-11-16,7
+,C025,Yuri Madeleaf,Product Designer,Screening,3,Not stalled,Rina,,moved recently,2026-11-16,7
+,C027,Abel Stubfield,Data Analyst,Interview,4,Not stalled,Vesna,,moved recently,2026-11-16,7
+,C029,Cyd Mockerell,Backend Engineer,Applied,2,Not stalled,Tomo,,moved recently,2026-11-16,7
+,C003,Cora Testwell,Product Designer,Hired,,Closed,Vesna,,closed stage,2026-11-16,7
+,C008,Hugo Notreal,Backend Engineer,Rejected,,Closed,Tomo,,closed stage,2026-11-16,7
+,C013,Mila Testova,Customer Success Lead,Rejected,,Closed,Rina,,closed stage,2026-11-16,7
+,C016,Pim Demoson,Product Designer,Withdrawn,,Closed,Rina,,closed stage,2026-11-16,7
+,C022,Vida Testoni,Backend Engineer,Hired,,Closed,Rina,,closed stage,2026-11-16,7
+,C030,Dax Placeholt,Customer Success Lead,Rejected,,Closed,Vesna,,closed stage,2026-11-16,7
