@@ -100,9 +100,9 @@ Good to know:
 - **Excel shows everything in one column?** With some regional settings, double-clicking a comma-separated file does that. Use Data > From Text/CSV and choose comma as the separator.
 - Excel may show the dates in your local style. The file itself keeps the text as typed on the board.
 - A value that starts with `=`, `+`, `-` or `@` (or their full-width forms) gets a leading apostrophe (`'`), so that a spreadsheet does not run it as a formula. A real name such as `-Smith` therefore shows as `'-Smith`. The same apostrophe is added after a semicolon that is followed by one of these characters (`x;=1` becomes `x;'=1`), because a spreadsheet that separates on semicolons starts a new cell there.
-- **This guard is a precaution, not a guarantee.** It was checked by reading the file back in tests, not in Excel itself. Treat a report made from a board you do not trust with care, and do not enable content or links a spreadsheet warns you about. Limits: `evidence.md` section 13.
+- **This guard is a precaution, not a guarantee.** It was checked by reading the file back in automated tests, and the candidate reviewed an agreed set of formula test cases by hand in Excel (`evidence.md` section 13.8). That covers one Excel setup, not every Excel version or regional setting, and it is not a general guarantee against spreadsheet formula injection. Treat a report made from a board you do not trust with care, and do not enable content or links a spreadsheet warns you about. Limits: `evidence.md` section 13.
 - The file is UTF-8 with a byte order mark, so Excel reads accented names correctly.
-- Not tested: opening the file in Excel itself, and Windows. See `evidence.md` sections 12 and 13.
+- Checked by hand in Excel by the candidate: the 12 columns and 30 candidates, the priority order, the three data issues, scheduled candidates and their next step dates, sorting and filtering, and special characters (`evidence.md` section 13.8). Not tested: other Excel versions and regional settings, other spreadsheet programs, and running the tool on Windows. See `evidence.md` sections 12 and 13.
 
 ## The rules
 
