@@ -3,18 +3,25 @@
 Reads a hiring-board CSV, finds active candidates whose stage has not changed for
 at least --days calendar days (default 7) with no next step booked, and prints who
 to follow up first with a suggested next step. Rows it cannot judge are listed
-separately with a reason. It only reads the input file: it sends nothing, writes
-nothing and decides nothing. A person reviews every line.
+separately with a reason. It only reads the input file: it sends nothing and
+decides nothing. It writes nothing unless --output (or --out) is given, and then
+only one new file: the same list as a CSV report for a spreadsheet. It never
+overwrites a file. A person reviews every line.
 
 Usage:
     python3 stall_alerter.py data/hiring_board.csv --as-of 2026-11-16 --days 7
+    python3 stall_alerter.py data/hiring_board.csv --as-of 2026-11-16 --output followup.csv
 
-Exit codes: 0 report printed, 2 input or argument problem (message on stderr).
+Exit codes: 0 report printed (and the CSV report written, if asked for), 2 input,
+argument or CSV report problem (message on stderr, no report).
+The CSV report was added after the Quest submission: docs/CSV_EXPORT_ARCHITECTURE.md.
 Rules: intent.md section 3 and implementation_plan.md section 4.
 """
 import argparse
 import csv
 import datetime
+import io
+import os
 import sys
 
 REQUIRED_COLUMNS = ("candidate_id", "candidate_name", "role", "stage",
@@ -30,6 +37,13 @@ NEXT_STEP = {
     "Interview": "Chase interviewer feedback or book the next round, then update the candidate.",
     "Offer": "Call the candidate about the pending offer and confirm the decision date.",
 }
+# CSV report (--output): column names, then status label per category in row order.
+EXPORT_HEADER = ("Priority", "Candidate ID", "Candidate name", "Role", "Hiring stage",
+                 "Days waiting", "Status", "Recruiter", "Next step date",
+                 "Action / explanation", "As of", "Threshold (days)")
+EXPORT_STATUS = (("stalled", "Follow up first"), ("data_issue", "Needs a data fix"),
+                 ("scheduled", "Scheduled"), ("not_stalled", "Not stalled"),
+                 ("closed", "Closed"))
 
 
 class InputError(Exception):
@@ -175,6 +189,67 @@ def render(results, as_of, threshold):
     return "\n".join(out) + "\n"
 
 
+def excel_safe(text):
+    """Text cell for a spreadsheet: one line, and never run as a formula."""
+    value = clean(text)
+    if value.startswith(("=", "+", "-", "@")):
+        value = "'" + value
+    return value
+
+
+def export_table(results, as_of, threshold):
+    """All rows for the CSV report, header first: one row per input row, by status group."""
+    table = [list(EXPORT_HEADER)]
+    for category, label in EXPORT_STATUS:
+        group = [r for r in results if r["category"] == category]
+        if category == "stalled":
+            group = prioritize(group)
+        for rank, r in enumerate(group, 1):
+            table.append([rank if category == "stalled" else "",
+                          excel_safe(r["candidate_id"]), excel_safe(r["candidate_name"]),
+                          excel_safe(r["role"]), excel_safe(stage_label(r["stage"])),
+                          "" if r["days"] is None else r["days"], label,
+                          excel_safe(r["recruiter"]), excel_safe(r["next_step_date"]),
+                          excel_safe(r["reason"]), as_of.isoformat(), threshold])
+    return table
+
+
+def csv_text(table):
+    buffer = io.StringIO(newline="")
+    csv.writer(buffer).writerows(table)
+    return buffer.getvalue()
+
+
+def check_output_path(output, csv_path):
+    """Return the reason the report must not be written to this path, or None."""
+    if not output:
+        return "--output needs a file name"
+    try:
+        same = os.path.samefile(output, csv_path)
+    except (OSError, ValueError):  # one of the two does not exist
+        same = False
+    if same:
+        return f"refusing to write the report over the input file: {clean(output)}"
+    if os.path.lexists(output):
+        return f"{clean(output)} already exists; choose a new name or delete it first"
+    return None
+
+
+def write_new_file(path, text):
+    """Create a new file and write the text. Never overwrites: mode "x" fails if the
+    path exists. If the write fails, the file created here is removed again."""
+    f = open(path, "x", encoding="utf-8-sig", newline="")
+    try:
+        with f:
+            f.write(text)
+    except OSError:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise
+
+
 def as_of_arg(text):
     value = parse_iso_date(text.strip())
     if value is None:
@@ -190,10 +265,18 @@ def main(argv=None):
                         help="reference date YYYY-MM-DD (default: today)")
     parser.add_argument("--days", type=int, default=7,
                         help="stall threshold in calendar days (default: 7)")
+    parser.add_argument("--output", "--out", dest="output", default=None, metavar="FILE",
+                        help="also write all rows to a new CSV report for a spreadsheet "
+                             "(refused if FILE already exists)")
     args = parser.parse_args(argv)
     if args.days < 1:
         print(f"error: --days must be 1 or more, got {args.days}", file=sys.stderr)
         return 2
+    if args.output is not None:
+        problem = check_output_path(args.output, args.csv_path)
+        if problem:
+            print(f"error: {problem}", file=sys.stderr)
+            return 2
     as_of = args.as_of or datetime.date.today()
     try:
         rows = load_rows(args.csv_path)
@@ -204,7 +287,17 @@ def main(argv=None):
     for row in rows:
         category, days, reason = classify(row, as_of, args.days)
         results.append(dict(row, category=category, days=days, reason=reason))
+    if args.output is not None:
+        table = export_table(results, as_of, args.days)
+        try:
+            write_new_file(args.output, csv_text(table))
+        except (OSError, ValueError) as e:
+            print(f"error: cannot write {clean(args.output)}: {clean(str(e))}", file=sys.stderr)
+            return 2
     sys.stdout.write(render(results, as_of, args.days))
+    if args.output is not None:
+        print(f"CSV report written: {clean(args.output)} ({len(table) - 1} rows)",
+              file=sys.stderr)
     return 0
 
 
